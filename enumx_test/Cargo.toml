@@ -1,0 +1,11 @@
+[package]
+name = "enumx_test"
+version = "0.1.0"
+authors = ["oooutlk <oooutlk@outlook.com>"]
+license = "MIT"
+edition = "2018"
+publish = false
+
+[dependencies]
+enumx = { path = "../enumx" }
+enumx_derive = { path = "../enumx_derive" }

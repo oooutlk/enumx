@@ -1,0 +1,19 @@
+[package]
+name = "cex_derive"
+version = "0.1.0"
+authors = ["oooutlk <oooutlk@outlook.com>"]
+license = "MIT"
+keywords = [ "exception", "error", "try", "failure", "ad-hoc" ]
+readme = "README.md"
+repository = "https://github.com/oooutlk/enumx"
+documentation = "https://docs.rs/cex_derive"
+categories = [ "rust-patterns" ]
+edition = "2018"
+description = "Concrete Error eXchange, or Checked EXception."
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "0.6"
+syn = { version = "0.15", features = ["full", "fold", "extra-traits"] }
