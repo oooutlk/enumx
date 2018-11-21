@@ -12,5 +12,5 @@ edition = "2018"
 description = "Concrete Error eXchange, or Checked EXception."
 
 [dependencies]
-enumx = { path = "../enumx" }
-cex_derive = { path = "../cex_derive" }
+enumx = "0.1"
+cex_derive = "0.1"

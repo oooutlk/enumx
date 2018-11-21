@@ -12,4 +12,4 @@ edition = "2018"
 description = "Anonymous enum type in rust."
 
 [dependencies]
-enumx_derive = { path = "../enumx_derive" }
+enumx_derive = "0.1"
