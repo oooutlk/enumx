@@ -11,6 +11,8 @@ pub enum LR<L,R> {
 pub enum Enum0 {}
 
 /// Anonymous `enum`.
+/// The library users do not need to implement this trait by hand.
+/// Simply use `Enum1`, `Enum2`, `Enum3`... etc.
 pub trait EnumX {
     type LR;
     fn from_lr( lr: Self::LR ) -> Self;
@@ -20,15 +22,15 @@ pub trait EnumX {
 use enumx_derive::EnumXDerives;
 
 macro_rules! enumx_types {
-    ($( $enum:ident<$($err:ident),+>{ $($variant:ident)+ } )+) => {$(
+    ($( $enum:ident<$($generic:ident),+>{ $($variant:ident)+ } )+) => {$(
         #[derive( EnumXDerives )]
         #[derive( Debug,PartialEq,Eq,PartialOrd,Ord )]
-        pub enum $enum<$($err),+> {
-            $( $variant( $err )),+
+        pub enum $enum<$($generic),+> {
+            $( $variant( $generic )),+
         }
 
-        impl<$($err),+> $enum<$($err),+> {$(
-            pub fn $variant( e: $err ) -> Self {
+        impl<$($generic),+> $enum<$($generic),+> {$(
+            pub fn $variant( e: $generic ) -> Self {
                 $enum::$variant( e )
             }
         )+}

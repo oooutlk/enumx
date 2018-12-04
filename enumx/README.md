@@ -88,9 +88,12 @@ However, **explicit `.into()` are required**.
 
 - The library users should use concrete types as the type parameters of EnumX, rather than generics.
 
+  This restriction may be removed in the upcoming version 0.2.0.
+
 - **DO NOT use nested `EnumX` and expect it be flatterned**.
 
   Currently this project does nothing to support flatterning.
+  For example,`Enum2<i32,usize>` cannot be converted to `Enum2<Enum2<i32,String>,usize>` in `#[enumx] fn`.
 
 - Current version supports up to 32 variants in a `EnumX`.
 

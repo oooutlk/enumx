@@ -4,15 +4,19 @@
 pub use enumx::*;
 
 /// Checked EXception.
+/// The library users do not need to implement this trait by hand.
+/// Simply use `CeX1`, `CeX2`, `CeX3`... etc.
 pub trait CeX {
     type LR;
     fn from_lr( lr: Self::LR, backtrace: Backtrace ) -> Self;
     fn into_lr( self ) -> ( Self::LR, Backtrace );
 }
 
+/// A struct for stack backtracing.
 #[derive( Debug,Default,PartialEq,Eq )]
 pub struct Backtrace( pub Vec<ThrowPoint> );
 
+/// A struct for tracing the propagation of the error.
 #[derive( Debug,Default,PartialEq,Eq )]
 pub struct ThrowPoint {
     pub line     : u32,

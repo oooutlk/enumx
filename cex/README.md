@@ -134,7 +134,10 @@ If you do not want backtracing, just use `Result<_,EnumX<_,...>` instead.
 
 - The library users should use concrete error types as the type parameters of CeX, rather than generics.
 
+  This restriction may be removed in the upcoming version 0.2.0.
+
 - **DO NOT use nested `CeX` and expect it be flatterned**.
+  For example,`Ce2<i32,usize>` cannot be converted to `Ce2<Ce2<i32,String>,usize>` in `#[cex] fn`.
 
   Currently this project does nothing to support flatterning.
 

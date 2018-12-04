@@ -20,7 +20,7 @@ fn test_enumx_fn() {
     #[enumx]
     fn f3( variant_index: usize ) -> Enum3<String,i32,bool> {
         match variant_index {
-            0 | 1 => f2(variant_index).into(),
+            0|1 => f2(variant_index).into(),
             2 => false.into(),
             _ => panic!( "variant index out of bounds" ),
         }

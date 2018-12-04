@@ -14,9 +14,9 @@ use syn::{parse_macro_input, parse_quote, Block, DeriveInput, Expr, GenericArgum
 
 #[derive( Default )]
 struct EnumxFn {
-    closure_type : Option<Type>,
-    enumx_path   : Option<Path>,
-    enum_types   : Vec<Type>,
+    closure_type  : Option<Type>,
+    enumx_path    : Option<Path>,
+    variant_types : Vec<Type>,
 }
 
 macro_rules! syntax_err {
@@ -48,9 +48,9 @@ impl Fold for EnumxFn {
     fn fold_return_type( &mut self, ret: ReturnType ) -> ReturnType {
         if let ReturnType::Type( _, mut closure_type ) = ret.clone() {
             self.enumx_path = if let Type::Path( TypePath{ qself:_, path }) = &*closure_type { Some( path.clone() )} else { None };
-            self.enum_types = mut_generics( &mut closure_type ).map( |err| err.clone() ).collect::<Vec<_>>();
+            self.variant_types = mut_generics( &mut closure_type ).map( |variant_type| variant_type.clone() ).collect::<Vec<_>>();
 
-            let concrete_types = self.enum_types.iter();
+            let concrete_types = self.variant_types.iter();
             *closure_type = parse_quote!( __EnumX<#(#concrete_types),*> );
             self.closure_type = Some( *closure_type );
         }
@@ -81,13 +81,13 @@ impl Fold for EnumxFn {
         let generics = make_generics( enum_cnt );
         let ( _, ty_generics, _ ) = generics.split_for_impl();
 
-        let concrete_enums = self.enum_types.iter();
+        let concrete_variants = self.variant_types.iter();
 
-        let impl_from_concrete_enums = self.enum_types.iter().enumerate().fold( Vec::<syn::ItemImpl>::new(), |mut impls,(index,enum_type)| {
+        let impl_from_concrete_variants = self.variant_types.iter().enumerate().fold( Vec::<syn::ItemImpl>::new(), |mut impls,(index,enum_type)| {
             let variant = ident( &format!( "_{}", index ));
-            let concrete_enums = concrete_enums.clone();
+            let concrete_variants = concrete_variants.clone();
             impls.push( parse_quote!{
-                impl From<#enum_type> for __EnumX<#(#concrete_enums),*> {
+                impl From<#enum_type> for __EnumX<#(#concrete_variants),*> {
                     fn from( e: #enum_type ) -> Self {
                         __EnumX( <#enumx_path>::#variant( e ))
                     }
@@ -97,19 +97,19 @@ impl Fold for EnumxFn {
         });
 
         let impl_from_enumx_types = (1..=enum_cnt).fold( Vec::<syn::ItemImpl>::new(), |mut acc,index| {
-            let concrete_enums = self.enum_types.iter();
-            let current_enumx_name = format!( "Enum{}", index );
-            let current_enumx_name = ident( &current_enumx_name );
+            let concrete_variants = self.variant_types.iter();
+            let enumx_name = format!( "Enum{}", index );
+            let enumx_name = ident( &enumx_name );
 
             let generics = make_generics( index );
             let ( impl_generics, ty_generics, _ ) = generics.split_for_impl();
 
             acc.push( syn::ItemImpl::from(
                 parse_quote! {
-                    impl #impl_generics From<#current_enumx_name #ty_generics> for __EnumX<#(#concrete_enums),*>
-                        where Self: From<<#current_enumx_name #ty_generics as EnumX>::LR>
+                    impl #impl_generics From<#enumx_name #ty_generics> for __EnumX<#(#concrete_variants),*>
+                        where Self: From<<#enumx_name #ty_generics as EnumX>::LR>
                     {
-                        fn from( src: #current_enumx_name #ty_generics ) -> Self {
+                        fn from( src: #enumx_name #ty_generics ) -> Self {
                             __EnumX::from( src.into_lr() )
                         }
                     }
@@ -119,21 +119,21 @@ impl Fold for EnumxFn {
         });
 
         let enumx_name = ident( &enumx_name );
-        let concrete_errors_ = concrete_enums.clone();
+        let concrete_variants_ = concrete_variants.clone();
 
         parse_quote! {{
             use enumx::*;
             struct __EnumX #ty_generics ( #enumx_name #ty_generics );
 
-            impl From<Enum0> for __EnumX<#(#concrete_enums),*> {
+            impl From<Enum0> for __EnumX<#(#concrete_variants),*> {
                 fn from( _: Enum0 ) -> Self {
                     unreachable!()
                 }
             }
 
-            #( #impl_from_concrete_enums )*
+            #( #impl_from_concrete_variants )*
 
-            impl<L,R> From<LR<L,R>> for __EnumX<#(#concrete_errors_),*>
+            impl<L,R> From<LR<L,R>> for __EnumX<#(#concrete_variants_),*>
                 where L : Into<Self>
                     , R : Into<Self>
             {
@@ -159,19 +159,14 @@ impl Fold for EnumxFn {
 struct EnumxBlock;
 
 impl Fold for EnumxBlock { 
+    // hook return statments to erase the wrapper type `__EnumX`
     fn fold_expr( &mut self, expr: Expr ) -> Expr {
-        match expr {
-            Expr::Return( _ ) => {
-                parse_quote!{{ 
-                    __EnumX::from( #expr )
-                }}
-            },
-            Expr::Try( _ ) => {
-                parse_quote!{{ 
-                    #expr
-                }}
-            },
-            _ => syn::fold::fold_expr( self, expr ),
+        if let Expr::Return( _ ) = expr {
+            parse_quote!{{ 
+                __EnumX::from( #expr )
+            }}
+        } else {
+            syn::fold::fold_expr( self, expr )
         }
     }
 }
@@ -180,8 +175,7 @@ impl Fold for EnumxBlock {
 pub fn enumx( _args: TokenStream, input: TokenStream ) -> TokenStream {
     let input = parse_macro_input!( input as ItemFn );
     let output = EnumxFn::default().fold_item_fn( input );
-    let expanded = quote!( #output );
-    TokenStream::from( expanded )
+    TokenStream::from( quote!( #output ))
 }
 
 #[proc_macro_derive( EnumXDerives )]
@@ -225,10 +219,10 @@ pub fn derive_enumx( input: TokenStream ) -> TokenStream {
         (pattern,variant)
     });
 
-    let ( pattern, variant ) = ( pattern.iter(), variant.iter() );
+    let ( pattern, variant   ) = ( pattern.iter(),  variant.iter()  );
     let ( pattern_, variant_ ) = ( pattern.clone(), variant.clone() );
 
-    let expanded = quote! {
+    TokenStream::from( quote! {
         impl #impl_generics EnumX for #ty #ty_generics {
             type LR = #lr;
 
@@ -245,8 +239,7 @@ pub fn derive_enumx( input: TokenStream ) -> TokenStream {
                 }
             }
         }
-    };
-    expanded.into()
+    })
 }
 
 fn ident( sym: &str ) -> Ident {
