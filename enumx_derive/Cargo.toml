@@ -1,6 +1,6 @@
 [package]
 name = "enumx_derive"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "enum", "anonymous", "union", "sum", "ad-hoc" ]
@@ -9,7 +9,7 @@ repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/enumx_derive"
 categories = [ "rust-patterns" ]
 edition = "2018"
-description = "Anonymous enum type in rust."
+description = "Ad-hoc enum or user-defined enum exchange."
 
 [lib]
 proc-macro = true

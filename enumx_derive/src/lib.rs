@@ -1,6 +1,10 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
 // Licensed under MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>
 
+//! This project provides derive implementation for user-defined enum exchange.
+//! 
+//! See [enumx README](https://github.com/oooutlk/enumx/blob/master/enumx/README.md) for more.
+
 #![recursion_limit="128"]
 
 extern crate proc_macro;
@@ -9,237 +13,91 @@ use self::proc_macro::TokenStream;
 use quote::quote;
 
 use syn::export::Span;
-use syn::fold::Fold;
-use syn::{parse_macro_input, parse_quote, Block, DeriveInput, Expr, GenericArgument, Ident, ItemFn, Pat, ReturnType, Path, PathArguments, Type, TypePath};
+use syn::{parse_quote, DeriveInput, Generics, Ident};
 
-#[derive( Default )]
-struct EnumxFn {
-    closure_type  : Option<Type>,
-    enumx_path    : Option<Path>,
-    variant_types : Vec<Type>,
-}
+#[proc_macro_derive( Exchange )]
+pub fn derive_exchange( input: TokenStream ) -> TokenStream {
+    let input: DeriveInput = syn::parse( input ).unwrap();
 
-macro_rules! syntax_err {
-    () => {
-        panic!( "#[enumx] functions should return something like `Enum_<_,..>`." );
-    }
-}
+    match input.data {
+        syn::Data::Enum( ref data ) => {
+            let name_ex = input.ident.clone();
+            let name_fx = input.ident.clone();
+            let name_tx = input.ident.clone();
+            let name_fv = input.ident;
 
-// gets mutable references of type `ty`'s generic types
-fn mut_generics<'a>( ty: &'a mut Type ) -> impl Iterator<Item=&'a mut Type> {
-    if let Type::Path( TypePath{ qself:_, ref mut path }) = ty {
-        if let Some( segment ) = path.segments.iter_mut().last() {
-            if let PathArguments::AngleBracketed( ref mut generic ) = segment.arguments {
-                return generic.args.iter_mut().filter_map( |arg| {
-                    if let GenericArgument::Type( ref mut ty ) = *arg {
-                        Some( ty )
-                    } else {
-                        None
-                    }
-                });
-            }
-        }
-    }
-    syntax_err!();
-}
+            let named_variant_fx = data.variants.iter().map( |v| v.ident.clone() );
+            let named_variant_tx = data.variants.iter().map( |v| v.ident.clone() );
 
-impl Fold for EnumxFn {
-    // Does not modify return type but gathers type infomation.
-    fn fold_return_type( &mut self, ret: ReturnType ) -> ReturnType {
-        if let ReturnType::Type( _, mut closure_type ) = ret.clone() {
-            self.enumx_path = if let Type::Path( TypePath{ qself:_, path }) = &*closure_type { Some( path.clone() )} else { None };
-            self.variant_types = mut_generics( &mut closure_type ).map( |variant_type| variant_type.clone() ).collect::<Vec<_>>();
+            let variant_cnt = data.variants.len();
 
-            let concrete_types = self.variant_types.iter();
-            *closure_type = parse_quote!( __EnumX<#(#concrete_types),*> );
-            self.closure_type = Some( *closure_type );
-        }
-        ret
-    }
+            let enumx_ex = ident( &format!( "Enum{}", variant_cnt ));
+            let enumx_fx = enumx_ex.clone();
+            let enumx_tx = enumx_fx.clone();
+            let enumx_fv = enumx_fx.clone();
 
-    // Here is the magic.
-    fn fold_block( &mut self, mut block: Block ) -> Block {
-        let closure_type = self.closure_type.take().expect( "closure must be of some type." );
-        let enumx_path = self.enumx_path.take().expect( "enumx must be of some path." );
-        let enumx_name = enumx_path.segments.iter().last().unwrap_or_else( || syntax_err!() ).ident.to_string();
+            let named_enum_fx = (0..variant_cnt).map( |_| name_fx.clone() );
+            let named_enum_tx = named_enum_fx.clone();
 
-        let enum_cnt = if &enumx_name[..4] == "Enum" {
-            block = EnumxBlock.fold_block( block );
-            enumx_name[4..].parse::<usize>().expect( "Type name should start with \"Enum\" and followed by an unsigned integer." )
-        } else {
-            syntax_err!();
-        };
+            let unamed_enum_fx = (0..variant_cnt).map( |_| enumx_fx.clone() );
+            let unamed_enum_tx = unamed_enum_fx.clone();
 
-        fn make_generics( count: usize ) -> syn::Generics {
-            syn::parse_str::<syn::Generics>(
-                &format!( "<{}>",
-                    (1..count).fold(
-                        String::from( "E0"), |acc,index| format!( "{},E{}", acc, index ))))
-                .expect("Generics must be something like <E0,E1,...>")
-        }
+            let unamed_variant_fx = (0..variant_cnt).map( |index| ident( &format!( "_{}", index )));
+            let unamed_variant_tx = unamed_variant_fx.clone();
 
-        let generics = make_generics( enum_cnt );
-        let ( _, ty_generics, _ ) = generics.split_for_impl();
+            let ( impl_generics_ex, ty_generics_ex, where_clause_ex ) = input.generics.split_for_impl();
+            let ( impl_generics_fx, ty_generics_fx, where_clause_fx ) = ( impl_generics_ex.clone(), ty_generics_ex.clone(), where_clause_ex.clone() );
+            let ( impl_generics_tx, ty_generics_tx, where_clause_tx ) = ( impl_generics_fx.clone(), ty_generics_fx.clone(), where_clause_fx.clone() );
+            let ( ty_generics_fv, where_clause_fv ) = ( ty_generics_fx.clone(), where_clause_fx.clone() );
 
-        let concrete_variants = self.variant_types.iter();
+            let mut generics = input.generics.clone();
+            add_generics( &mut generics, &[ "Variant", "Index" ]);
+            let ( impl_generics_fv, _, _ ) = generics.split_for_impl();
 
-        let impl_from_concrete_variants = self.variant_types.iter().enumerate().fold( Vec::<syn::ItemImpl>::new(), |mut impls,(index,enum_type)| {
-            let variant = ident( &format!( "_{}", index ));
-            let concrete_variants = concrete_variants.clone();
-            impls.push( parse_quote!{
-                impl From<#enum_type> for __EnumX<#(#concrete_variants),*> {
-                    fn from( e: #enum_type ) -> Self {
-                        __EnumX( <#enumx_path>::#variant( e ))
-                    }
+            let clause_fv = where_clause_fv .map( |where_clause_fv| &where_clause_fv.predicates );
+
+            let expanded = quote! {
+                impl #impl_generics_ex Exchange for #name_ex #ty_generics_ex #where_clause_ex {
+                    type EnumX = #enumx_ex #ty_generics_ex;
                 }
-            });
-            impls
-        });
 
-        let impl_from_enumx_types = (1..=enum_cnt).fold( Vec::<syn::ItemImpl>::new(), |mut acc,index| {
-            let concrete_variants = self.variant_types.iter();
-            let enumx_name = format!( "Enum{}", index );
-            let enumx_name = ident( &enumx_name );
-
-            let generics = make_generics( index );
-            let ( impl_generics, ty_generics, _ ) = generics.split_for_impl();
-
-            acc.push( syn::ItemImpl::from(
-                parse_quote! {
-                    impl #impl_generics From<#enumx_name #ty_generics> for __EnumX<#(#concrete_variants),*>
-                        where Self: From<<#enumx_name #ty_generics as EnumX>::LR>
-                    {
-                        fn from( src: #enumx_name #ty_generics ) -> Self {
-                            __EnumX::from( src.into_lr() )
+                impl #impl_generics_fx From<#enumx_fx #ty_generics_fx> for #name_fx #ty_generics_fx #where_clause_fx {
+                    fn from( src: #enumx_fx #ty_generics_fx ) -> Self {
+                        match src {
+                            #( #unamed_enum_fx::#unamed_variant_fx(v) => #named_enum_fx::#named_variant_fx(v), )*
                         }
                     }
                 }
-            ));
-            acc
-        });
 
-        let enumx_name = ident( &enumx_name );
-        let concrete_variants_ = concrete_variants.clone();
-
-        parse_quote! {{
-            use enumx::*;
-            struct __EnumX #ty_generics ( #enumx_name #ty_generics );
-
-            impl From<Enum0> for __EnumX<#(#concrete_variants),*> {
-                fn from( _: Enum0 ) -> Self {
-                    unreachable!()
-                }
-            }
-
-            #( #impl_from_concrete_variants )*
-
-            impl<L,R> From<LR<L,R>> for __EnumX<#(#concrete_variants_),*>
-                where L : Into<Self>
-                    , R : Into<Self>
-            {
-                fn from( src: LR<L,R> ) -> Self {
-                    match src {
-                        LR::L( lhs ) => lhs.into(),
-                        LR::R( rhs ) => rhs.into(),
+                impl #impl_generics_tx From<#name_tx #ty_generics_tx> for #enumx_tx #ty_generics_tx #where_clause_tx {
+                    fn from( src: #name_tx #ty_generics_tx ) -> Self {
+                        match src {
+                            #( #named_enum_tx::#named_variant_tx(v) => #unamed_enum_tx::#unamed_variant_tx(v), )*
+                        }
                     }
                 }
-            }
 
-            #( #impl_from_enumx_types )*
- 
-            let __enumx_result = {
-                let mut _enumx_closure = || -> #closure_type { #block };
-                _enumx_closure()
+                impl #impl_generics_fv FromVariant<Variant,Index> for #name_fv #ty_generics_fv
+                    where Self                      : From<#enumx_fv #ty_generics_fv>
+                        , #enumx_fv #ty_generics_fv : FromVariant<Variant,Index>
+                        , #(#clause_fv)*
+                {
+                    fn from_variant( variant: Variant ) -> Self {
+                        #name_fv::from( #enumx_fv:: #ty_generics_fv::from_variant( variant ))
+                    }
+                }
             };
-            __enumx_result.0
-        }}
+            expanded.into()
+        },
+        _ => panic!( "Only `enum`s can be `Exchange`." ),
     }
 }
 
-struct EnumxBlock;
-
-impl Fold for EnumxBlock { 
-    // hook return statments to erase the wrapper type `__EnumX`
-    fn fold_expr( &mut self, expr: Expr ) -> Expr {
-        if let Expr::Return( _ ) = expr {
-            parse_quote!{{ 
-                __EnumX::from( #expr )
-            }}
-        } else {
-            syn::fold::fold_expr( self, expr )
-        }
+fn add_generics( generics: &mut Generics, names: &[&'static str] ) {
+    for name in names {
+        let name = ident( name );
+        generics.params.push( parse_quote!( #name ));
     }
-}
-
-#[proc_macro_attribute]
-pub fn enumx( _args: TokenStream, input: TokenStream ) -> TokenStream {
-    let input = parse_macro_input!( input as ItemFn );
-    let output = EnumxFn::default().fold_item_fn( input );
-    TokenStream::from( quote!( #output ))
-}
-
-#[proc_macro_derive( EnumXDerives )]
-pub fn derive_enumx( input: TokenStream ) -> TokenStream {
-    let input: DeriveInput = syn::parse( input ).unwrap();
-
-    let ( impl_generics, ty_generics, _ ) = input.generics.split_for_impl();
-
-    let ty = input.ident;
-    let type_name = ty.to_string();
-
-    let ( enum_name, enum_cnt );
-    if &type_name[..4] == "Enum" {
-        enum_cnt = type_name[4..].parse::<usize>().expect( "Type name should start with \"Enum\" and followed by an unsigned integer." );
-        enum_name = vec![ ident( &format!( "Enum{}", &type_name[4..] )); enum_cnt ];
-    } else {
-        syntax_err!();
-    }
-
-    let enum_name = enum_name.iter();
-    let enum_name_ = enum_name.clone();
-
-    let lr = syn::parse_str::<Type>(
-                &format!( "{}Enum0{}"
-                    , (0..enum_cnt).fold( String::new(), |acc,i| format!( "{}LR<E{},", acc, i ))
-                    , ">".repeat( enum_cnt )
-                )
-             ).unwrap();
-
-    let (pattern,variant) = (0..enum_cnt).fold( (Vec::new(),Vec::new()), |(mut pattern, mut variant), index| {
-        pattern.push( syn::parse_str::<Pat>(
-            &format!( "{}{}{}"
-                , "LR::R(".repeat( index )
-                , "LR::L(e)"
-                , ")".repeat( index )
-            )
-        ).unwrap() );
-        variant.push( syn::parse_str::<Ident>(
-            &format!( "_{}", index )
-        ).unwrap() );
-        (pattern,variant)
-    });
-
-    let ( pattern, variant   ) = ( pattern.iter(),  variant.iter()  );
-    let ( pattern_, variant_ ) = ( pattern.clone(), variant.clone() );
-
-    TokenStream::from( quote! {
-        impl #impl_generics EnumX for #ty #ty_generics {
-            type LR = #lr;
-
-            fn from_lr( lr: Self::LR ) -> Self {
-                match lr {
-                    #( #pattern => #enum_name::#variant(e), )*
-                    _ => panic!( "Nested enumx::LR's last variant should be enumx::Enum0" ),
-                }
-            }
-
-            fn into_lr( self ) -> Self::LR {
-                match self {
-                    #( #enum_name_::#variant_(e) => #pattern_, )*
-                }
-            }
-        }
-    })
 }
 
 fn ident( sym: &str ) -> Ident {
