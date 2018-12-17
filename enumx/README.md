@@ -22,14 +22,14 @@ A user-defined `Exchange` enum can be `exchange_from()` another user-defined `Ex
 
 # Examples
 
-See [test code](https://github.com/oooutlk/enumx/blob/master/enumx/src/lib.rs#L512).
+See [test code](https://github.com/oooutlk/enumx/blob/master/enumx/src/lib.rs#L191).
 
 # Limitation
 
-Current version supports up to 16 variants by default, and extended to 32 variants with `enum17_enum32` feature.
+Current version supports up to 16 variants by default, and extended to 32 variants with `enum32` feature.
 In otherwords, `Enum1`..=`Enum16` is available but `Enum17` and the succeeding enums are not, by default.
-With `enum17_enum32` feature, `Enum32` is available but `Enum33` and the succeeding enums are not.
-But notice that it may cost several minutes to compile this crate with `enum17_enum32` feature.
+With `enum32` feature, `Enum32` is available but `Enum33` and the succeeding enums are not.
+But notice that it may cost several minutes to compile this crate with `enum32` feature.
 
 # License
 

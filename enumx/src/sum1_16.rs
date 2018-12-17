@@ -1,0 +1,16 @@
+#[macro_export] macro_rules! Sum1  {( impl $($tt:tt)* ) => { Enum1 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum2  {( impl $($tt:tt)* ) => { Enum2 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum3  {( impl $($tt:tt)* ) => { Enum3 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum4  {( impl $($tt:tt)* ) => { Enum4 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum5  {( impl $($tt:tt)* ) => { Enum5 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum6  {( impl $($tt:tt)* ) => { Enum6 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum7  {( impl $($tt:tt)* ) => { Enum7 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum8  {( impl $($tt:tt)* ) => { Enum8 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum9  {( impl $($tt:tt)* ) => { Enum9 <impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum10 {( impl $($tt:tt)* ) => { Enum10<impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum11 {( impl $($tt:tt)* ) => { Enum11<impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum12 {( impl $($tt:tt)* ) => { Enum12<impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum13 {( impl $($tt:tt)* ) => { Enum13<impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum14 {( impl $($tt:tt)* ) => { Enum14<impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum15 {( impl $($tt:tt)* ) => { Enum15<impl $($tt)*,impl $($tt)*> }}
+#[macro_export] macro_rules! Sum16 {( impl $($tt:tt)* ) => { Enum16<impl $($tt)*,impl $($tt)*> }}

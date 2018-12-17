@@ -43,30 +43,30 @@ pub trait Exchange {
 }
 
 /// Constructs a user-defined enum from another user-defined enum.
-pub trait ExchangeFrom<SrcNamed,SrcUnnamed,DestNamed,DestUnnamed,Indices> {
-    fn exchange_from( src: SrcNamed ) -> Self;
+pub trait ExchangeFrom<Src,Indices> {
+    fn exchange_from( src: Src ) -> Self;
 }
 
-impl<SrcNamed,SrcUnnamed,DestNamed,DestUnnamed,Indices> ExchangeFrom<SrcNamed,SrcUnnamed,DestNamed,DestUnnamed,Indices> for DestNamed
-    where DestNamed   : Exchange<EnumX=DestUnnamed> + From<DestUnnamed>
-        , SrcNamed    : Exchange<EnumX=SrcUnnamed>  + Into<SrcUnnamed>
-        , DestUnnamed : FromEnumX<SrcUnnamed,Indices>
+impl<Src,SrcAdhoc,Dest,DestAdhoc,Indices> ExchangeFrom<Src,Indices> for Dest
+    where Dest      : Exchange<EnumX=DestAdhoc> + From<DestAdhoc>
+        , Src       : Exchange<EnumX=SrcAdhoc>  + Into<SrcAdhoc>
+        , DestAdhoc : FromEnumX<SrcAdhoc,Indices>
 {
-    fn exchange_from( src: SrcNamed ) -> Self {
-        DestNamed::from( FromEnumX::<SrcUnnamed,Indices>::from_enumx( src.into() ))
+    fn exchange_from( src: Src ) -> Self {
+        Dest::from( FromEnumX::<SrcAdhoc,Indices>::from_enumx( src.into() ))
     }
 }
 
 /// Converts a user-defined enum into another user-defined enum.
-pub trait ExchangeInto<SrcNamed,SrcUnnamed,DestNamed,DestUnnamed,Indices> {
-    fn exchange_into( self ) -> DestNamed;
+pub trait ExchangeInto<Dest,Indices> {
+    fn exchange_into( self ) -> Dest;
 }
 
-impl<SrcNamed,SrcUnnamed,DestNamed,DestUnnamed,Indices> ExchangeInto<SrcNamed,SrcUnnamed,DestNamed,DestUnnamed,Indices> for SrcNamed
-    where DestNamed: ExchangeFrom<SrcNamed,SrcUnnamed,DestNamed,DestUnnamed,Indices>
+impl<Src,Dest,Indices> ExchangeInto<Dest,Indices> for Src
+    where Dest: ExchangeFrom<Src,Indices>
 {
-    fn exchange_into( self ) -> DestNamed {
-        DestNamed::exchange_from( self )
+    fn exchange_into( self ) -> Dest {
+        Dest::exchange_from( self )
     }
 }
 
@@ -88,7 +88,7 @@ macro_rules! variant_index_types {
     )+}
 }
 
-variant_index_types! { V0 V1 V2 V3 V4 V5 V6 V7 V8 V9 V10 V11 V12 V13 V14 V15 V16 V17 V18 V19 V20 V21 V22 V23 V24 V25 V26 V27 V28 V29 V30 V31 V32 }
+variant_index_types! { V0 V1 V2 V3 V4 V5 V6 V7 V8 V9 V10 V11 V12 V13 V14 V15 V16 }
 
 macro_rules! enum_types {
     ($( $enum:ident<$($generic:ident),+>{ $($variant_name:ident)+ } )+) => {$(
@@ -105,26 +105,10 @@ macro_rules! enum_types {
     )+}
 }
 
-enum_types! {
-     Enum1<T0>{ _0 }
-     Enum2<T0,T1>{ _0 _1 }
-     Enum3<T0,T1,T2>{ _0 _1 _2 }
-     Enum4<T0,T1,T2,T3>{ _0 _1 _2 _3 }
-     Enum5<T0,T1,T2,T3,T4>{ _0 _1 _2 _3 _4 }
-     Enum6<T0,T1,T2,T3,T4,T5>{ _0 _1 _2 _3 _4 _5 }
-     Enum7<T0,T1,T2,T3,T4,T5,T6>{ _0 _1 _2 _3 _4 _5 _6 }
-     Enum8<T0,T1,T2,T3,T4,T5,T6,T7>{ _0 _1 _2 _3 _4 _5 _6 _7 }
-     Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 }
-     Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 }
-     Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _10 }
-     Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _10 _11 }
-     Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _10 _11 _12 }
-     Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _10 _11 _12 _13 }
-     Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _10 _11 _12 _13 _14 }
-     Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>{ _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _10 _11 _12 _13 _14 _15 }
-}
+include!( "enum1_16.rs" );
+#[cfg( feature="enum32" )] include!("enum17_32.rs");
 
-macro_rules! from_variant {
+macro_rules! enum_variant {
     ( $enum:ident<$($generics:ident),+>, $variant_name:ident, $variant_ty:ident, $variant_idx:ident ) => {
         impl<$($generics),+> FromVariant<$variant_ty,$variant_idx> for $enum<$($generics),+> {
             fn from_variant( variant: $variant_ty ) -> Self {
@@ -134,157 +118,8 @@ macro_rules! from_variant {
     }
 }
 
-from_variant!{ Enum1<T0>, _0, T0, V0 }
-
-from_variant!{ Enum2<T0,T1>, _0, T0, V0 }
-from_variant!{ Enum2<T0,T1>, _1, T1, V1 }
-
-from_variant!{ Enum3<T0,T1,T2>, _0, T0, V0 }
-from_variant!{ Enum3<T0,T1,T2>, _1, T1, V1 }
-from_variant!{ Enum3<T0,T1,T2>, _2, T2, V2 }
-
-from_variant!{ Enum4<T0,T1,T2,T3>, _0, T0, V0 }
-from_variant!{ Enum4<T0,T1,T2,T3>, _1, T1, V1 }
-from_variant!{ Enum4<T0,T1,T2,T3>, _2, T2, V2 }
-from_variant!{ Enum4<T0,T1,T2,T3>, _3, T3, V3 }
-
-from_variant!{ Enum5<T0,T1,T2,T3,T4>, _0, T0, V0 }
-from_variant!{ Enum5<T0,T1,T2,T3,T4>, _1, T1, V1 }
-from_variant!{ Enum5<T0,T1,T2,T3,T4>, _2, T2, V2 }
-from_variant!{ Enum5<T0,T1,T2,T3,T4>, _3, T3, V3 }
-from_variant!{ Enum5<T0,T1,T2,T3,T4>, _4, T4, V4 }
-
-from_variant!{ Enum6<T0,T1,T2,T3,T4,T5>, _0, T0, V0 }
-from_variant!{ Enum6<T0,T1,T2,T3,T4,T5>, _1, T1, V1 }
-from_variant!{ Enum6<T0,T1,T2,T3,T4,T5>, _2, T2, V2 }
-from_variant!{ Enum6<T0,T1,T2,T3,T4,T5>, _3, T3, V3 }
-from_variant!{ Enum6<T0,T1,T2,T3,T4,T5>, _4, T4, V4 }
-from_variant!{ Enum6<T0,T1,T2,T3,T4,T5>, _5, T5, V5 }
-
-from_variant!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, _0, T0, V0 }
-from_variant!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, _1, T1, V1 }
-from_variant!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, _2, T2, V2 }
-from_variant!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, _3, T3, V3 }
-from_variant!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, _4, T4, V4 }
-from_variant!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, _5, T5, V5 }
-from_variant!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, _6, T6, V6 }
-
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _0, T0, V0 }
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _1, T1, V1 }
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _2, T2, V2 }
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _3, T3, V3 }
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _4, T4, V4 }
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _5, T5, V5 }
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _6, T6, V6 }
-from_variant!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, _7, T7, V7 }
-
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _0, T0, V0 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _1, T1, V1 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _2, T2, V2 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _3, T3, V3 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _4, T4, V4 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _5, T5, V5 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _6, T6, V6 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _7, T7, V7 }
-from_variant!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, _8, T8, V8 }
-
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _0, T0, V0 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _1, T1, V1 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _2, T2, V2 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _3, T3, V3 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _4, T4, V4 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _5, T5, V5 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _6, T6, V6 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _7, T7, V7 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _8, T8, V8 }
-from_variant!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, _9, T9, V9 }
-
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _0, T0, V0 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _1, T1, V1 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _2, T2, V2 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _3, T3, V3 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _4, T4, V4 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _5, T5, V5 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _6, T6, V6 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _7, T7, V7 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _8, T8, V8 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _9, T9, V9 }
-from_variant!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, _10, T10, V10 }
-
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _0, T0, V0 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _1, T1, V1 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _2, T2, V2 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _3, T3, V3 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _4, T4, V4 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _5, T5, V5 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _6, T6, V6 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _7, T7, V7 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _8, T8, V8 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _9, T9, V9 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _10, T10, V10 }
-from_variant!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, _11, T11, V11 }
-
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _0, T0, V0 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _1, T1, V1 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _2, T2, V2 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _3, T3, V3 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _4, T4, V4 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _5, T5, V5 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _6, T6, V6 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _7, T7, V7 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _8, T8, V8 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _9, T9, V9 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _10, T10, V10 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _11, T11, V11 }
-from_variant!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, _12, T12, V12 }
-
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _0, T0, V0 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _1, T1, V1 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _2, T2, V2 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _3, T3, V3 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _4, T4, V4 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _5, T5, V5 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _6, T6, V6 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _7, T7, V7 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _8, T8, V8 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _9, T9, V9 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _10, T10, V10 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _11, T11, V11 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _12, T12, V12 }
-from_variant!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, _13, T13, V13 }
-
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _0, T0, V0 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _1, T1, V1 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _2, T2, V2 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _3, T3, V3 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _4, T4, V4 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _5, T5, V5 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _6, T6, V6 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _7, T7, V7 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _8, T8, V8 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _9, T9, V9 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _10, T10, V10 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _11, T11, V11 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _12, T12, V12 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _13, T13, V13 }
-from_variant!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, _14, T14, V14 }
- 
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _0, T0, V0 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _1, T1, V1 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _2, T2, V2 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _3, T3, V3 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _4, T4, V4 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _5, T5, V5 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _6, T6, V6 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _7, T7, V7 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _8, T8, V8 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _9, T9, V9 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _10, T10, V10 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _11, T11, V11 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _12, T12, V12 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _13, T13, V13 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _14, T14, V14 }
-from_variant!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, _15, T15, V15 }
+include!( "enum_variant1_16.rs" );
+#[cfg( feature="enum32" )] include!("enum_variant17_32.rs");
 
 impl<U0> IntoEnumX<Enum1<U0>,Nil> for Enum0 {
     fn into_enumx( self ) -> Enum1<U0> { match self {} }
@@ -340,173 +175,17 @@ macro_rules! into_enumx {
     }
 }
 
-into_enum0!{               Enum2<U0,U1>, Enum1 }
-into_enum1!{               Enum2<U0,U1> }
-into_enumx!{ Enum2<T0,T1>, Enum2<U0,U1>, Enum1{_0 _1} }
+include!("into_enum2_16.rs");
+#[cfg( feature="enum32" )] include!("into_enum17_32.rs");
 
-into_enum0!{                  Enum3<U0,U1,U2>, Enum2 }
-into_enum1!{                  Enum3<U0,U1,U2> }
-into_enumx!{ Enum2<T0,T1>,    Enum3<U0,U1,U2>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>, Enum3<U0,U1,U2>, Enum2{_0 _1 _1 _2} }
+include!("sum1_16.rs");
+#[cfg( feature="enum32" )] include!("sum17_32.rs");
 
-into_enum0!{                     Enum4<U0,U1,U2,U3>, Enum3 }
-into_enum1!{                     Enum4<U0,U1,U2,U3> }
-into_enumx!{ Enum2<T0,T1>,       Enum4<U0,U1,U2,U3>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,    Enum4<U0,U1,U2,U3>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>, Enum4<U0,U1,U2,U3>, Enum3{_0 _1 _1 _2 _2 _3} }
+include!("deref1_16.rs");
+#[cfg( feature="enum32" )] include!("deref17_32.rs");
 
-into_enum0!{                        Enum5<U0,U1,U2,U3,U4>, Enum4 }
-into_enum1!{                        Enum5<U0,U1,U2,U3,U4> }
-into_enumx!{ Enum2<T0,T1>,          Enum5<U0,U1,U2,U3,U4>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,       Enum5<U0,U1,U2,U3,U4>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,    Enum5<U0,U1,U2,U3,U4>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>, Enum5<U0,U1,U2,U3,U4>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-
-into_enum0!{                           Enum6<U0,U1,U2,U3,U4,U5>, Enum5 }
-into_enum1!{                           Enum6<U0,U1,U2,U3,U4,U5> }
-into_enumx!{ Enum2<T0,T1>,             Enum6<U0,U1,U2,U3,U4,U5>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,          Enum6<U0,U1,U2,U3,U4,U5>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,       Enum6<U0,U1,U2,U3,U4,U5>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,    Enum6<U0,U1,U2,U3,U4,U5>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>, Enum6<U0,U1,U2,U3,U4,U5>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-
-into_enum0!{                              Enum7<U0,U1,U2,U3,U4,U5,U6>, Enum6 }
-into_enum1!{                              Enum7<U0,U1,U2,U3,U4,U5,U6> }
-into_enumx!{ Enum2<T0,T1>,                Enum7<U0,U1,U2,U3,U4,U5,U6>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,             Enum7<U0,U1,U2,U3,U4,U5,U6>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,          Enum7<U0,U1,U2,U3,U4,U5,U6>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,       Enum7<U0,U1,U2,U3,U4,U5,U6>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,    Enum7<U0,U1,U2,U3,U4,U5,U6>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>, Enum7<U0,U1,U2,U3,U4,U5,U6>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-
-into_enum0!{                                 Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum7 }
-into_enum1!{                                 Enum8<U0,U1,U2,U3,U4,U5,U6,U7> }
-into_enumx!{ Enum2<T0,T1>,                   Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,             Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,          Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,       Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,    Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>, Enum8<U0,U1,U2,U3,U4,U5,U6,U7>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-
-into_enum0!{                                    Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum8 }
-into_enum1!{                                    Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8> }
-into_enumx!{ Enum2<T0,T1>,                      Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                   Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,             Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,          Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,       Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,    Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>, Enum9<U0,U1,U2,U3,U4,U5,U6,U7,U8>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-
-into_enum0!{                                        Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum9 }
-into_enum1!{                                        Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9> }
-into_enumx!{ Enum2<T0,T1>,                          Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                       Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                    Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,                 Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,              Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,           Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,        Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>,     Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-into_enumx!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>, Enum10<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9>, Enum9{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9} }
-
-into_enum0!{                                            Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum10 }
-into_enum1!{                                            Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10> }
-into_enumx!{ Enum2<T0,T1>,                              Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                           Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                        Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,                     Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,                  Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,               Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,            Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>,         Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-into_enumx!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>,     Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum9{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9} }
-into_enumx!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>, Enum11<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10>, Enum10{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10} }
-
-into_enum0!{                                                Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum11 }
-into_enum1!{                                                Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11> }
-into_enumx!{ Enum2<T0,T1>,                                  Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                               Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                            Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,                         Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,                      Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,                   Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,                Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>,             Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-into_enumx!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>,         Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum9{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9} }
-into_enumx!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>,     Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum10{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10} }
-into_enumx!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>, Enum12<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11>, Enum11{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11} }
-
-into_enum0!{                                                    Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum12 }
-into_enum1!{                                                    Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12> }
-into_enumx!{ Enum2<T0,T1>,                                      Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                                   Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                                Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,                             Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,                          Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,                       Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,                    Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>,                 Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-into_enumx!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>,             Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum9{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9} }
-into_enumx!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>,         Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum10{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10} }
-into_enumx!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>,     Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum11{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11} }
-into_enumx!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>, Enum13<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12>, Enum12{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12} }
-
-into_enum0!{                                                        Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum13 }
-into_enum1!{                                                        Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13> }
-into_enumx!{ Enum2<T0,T1>,                                          Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                                       Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                                    Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,                                 Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,                              Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,                           Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,                        Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>,                     Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-into_enumx!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>,                 Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum9{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9} }
-into_enumx!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>,             Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum10{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10} }
-into_enumx!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>,         Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum11{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11} }
-into_enumx!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>,     Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum12{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12} }
-into_enumx!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>, Enum14<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13>, Enum13{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12 _12 _13} }
-
-into_enum0!{                                                            Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum14 }
-into_enum1!{                                                            Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14> }
-into_enumx!{ Enum2<T0,T1>,                                              Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                                           Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                                        Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,                                     Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,                                  Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,                               Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,                            Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>,                         Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-into_enumx!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>,                     Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum9{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9} }
-into_enumx!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>,                 Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum10{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10} }
-into_enumx!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>,             Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum11{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11} }
-into_enumx!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>,         Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum12{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12} }
-into_enumx!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>,     Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum13{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12 _12 _13} }
-into_enumx!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>, Enum15<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14>, Enum14{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12 _12 _13 _13 _14} }
-
-into_enum0!{                                                                Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum15 }
-into_enum1!{                                                                Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15> }
-into_enumx!{ Enum2<T0,T1>,                                                  Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum1{_0 _1} }
-into_enumx!{ Enum3<T0,T1,T2>,                                               Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum2{_0 _1 _1 _2} }
-into_enumx!{ Enum4<T0,T1,T2,T3>,                                            Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum3{_0 _1 _1 _2 _2 _3} }
-into_enumx!{ Enum5<T0,T1,T2,T3,T4>,                                         Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum4{_0 _1 _1 _2 _2 _3 _3 _4} }
-into_enumx!{ Enum6<T0,T1,T2,T3,T4,T5>,                                      Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum5{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5} }
-into_enumx!{ Enum7<T0,T1,T2,T3,T4,T5,T6>,                                   Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum6{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6} }
-into_enumx!{ Enum8<T0,T1,T2,T3,T4,T5,T6,T7>,                                Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum7{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7} }
-into_enumx!{ Enum9<T0,T1,T2,T3,T4,T5,T6,T7,T8>,                             Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum8{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8} }
-into_enumx!{ Enum10<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9>,                         Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum9{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9} }
-into_enumx!{ Enum11<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>,                     Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum10{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10} }
-into_enumx!{ Enum12<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>,                 Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum11{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11} }
-into_enumx!{ Enum13<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12>,             Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum12{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12} }
-into_enumx!{ Enum14<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13>,         Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum13{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12 _12 _13} }
-into_enumx!{ Enum15<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14>,     Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum14{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12 _12 _13 _13 _14} }
-into_enumx!{ Enum16<T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15>, Enum16<U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15>, Enum15{_0 _1 _1 _2 _2 _3 _3 _4 _4 _5 _5 _6 _6 _7 _7 _8 _8 _9 _9 _10 _10 _11 _11 _12 _12 _13 _13 _14 _14 _15} }
-
-#[cfg(feature="enum17_enum32")]
-include!("enum17_enum32.rs");
+#[cfg(not( feature="enum32" ))] include!("enum_macro_1_16.rs");
+#[cfg(     feature="enum32"  )] include!("enum_macro_1_32.rs");
 
 #[cfg( test )]
 mod test {
@@ -519,8 +198,10 @@ mod test {
         fn test_from_variant() {
             let enum1 = Enum1::<i32>::from_variant( 2018 );
             assert_eq!( enum1, Enum1::_0( 2018 ));
+
             let enum2 = Enum2::<i32,String>::from_variant( "rust".to_string() );
             assert_eq!( enum2, Enum2::_1( "rust".to_string() ));
+
             let enum3 = Enum3::<i32,String,bool>::from_variant( true );
             assert_eq!( enum3, Enum3::_2( true ));
         }
@@ -580,6 +261,7 @@ mod test {
 
     mod test_named {
         use super::*;
+        extern crate enumx_derive;
         use enumx_derive::Exchange;
 
         #[derive(Exchange,Debug,PartialEq,Eq)]
@@ -589,7 +271,7 @@ mod test {
 
         #[derive(Exchange,Debug,PartialEq,Eq)]
         enum Two<T0,T1> {
-            Formmer(T0),
+            Former(T0),
             Latter(T1),
         }
 
@@ -633,7 +315,7 @@ mod test {
             assert_eq!( two, Two::Latter( "rust".to_string() ));
 
             let two: Two<String,i32> = two.exchange_into();
-            assert_eq!( two, Two::Formmer( "rust".to_string() ));
+            assert_eq!( two, Two::Former( "rust".to_string() ));
 
             let three: Three<bool,i32,String> = two.exchange_into();
             assert_eq!( three, Three::Third( "rust".to_string() ));
@@ -653,13 +335,60 @@ mod test {
             assert_eq!( two, Two::Latter( 2018 ));
 
             let two = Two::<i32,String>::exchange_from( two );
-            assert_eq!( two, Two::Formmer( 2018 ));
+            assert_eq!( two, Two::Former( 2018 ));
 
             let three = Three::<bool,String,i32>::exchange_from( two );
             assert_eq!( three, Three::Third( 2018 ));
 
             let three = Three::<i32,String,bool>::exchange_from( three );
             assert_eq!( three, Three::First( 2018 ));
+        }
+
+        #[test]
+        fn test_adhoc_from_enumx_named() {
+            let three = Three::<bool,String,i32>::from_variant( 2018 );
+            let enum3 = Enum3::<String,i32,bool>::from_enumx( three );
+            assert_eq!( enum3, Enum3::_1( 2018 ));
+
+            #[derive( Exchange, Debug, PartialEq, Eq )]
+            enum IU { I(i32), U(u32) }
+
+            #[derive( Exchange, Debug, PartialEq, Eq )]
+            enum BIU { B(bool), I(i32), U(u32) }
+        }
+
+        #[test]
+        fn test_named_into_enumx_adhoc() {
+            let three = Three::<bool,String,i32>::from_variant( 2018 );
+            let enum3: Enum3<String,i32,bool> = three.into_enumx();
+            assert_eq!( enum3, Enum3::_1( 2018 ));
+        }
+
+        #[test]
+        fn test_deref() {
+            fn foo<'a>( data: &'a [u32], f: bool ) -> Sum2!( impl Iterator<Item=u32> + 'a ) {
+                if f {
+                    Enum2::_0( data.iter().map( |x| 2 * x ))
+                } else {
+                    Enum2::_1( data.iter().map( |x| x + 2 ))
+                }
+            }
+
+            let data = [ 1, 2, 3 ];
+
+            let mut iter = foo( &data[..], true );
+            assert_eq!( deref2!( iter,size_hint() ), (3,Some(3)) );
+            assert_eq!( deref_mut2!( iter,next() ), Some(2) );
+            assert_eq!( deref_mut2!( iter,next() ), Some(4) );
+            assert_eq!( deref_mut2!( iter,next() ), Some(6) );
+            assert_eq!( deref_mut2!( iter,next() ), None    );
+
+            let mut iter = foo( &data[..], false );
+            assert_eq!( deref2!( iter,size_hint() ), (3,Some(3)) );
+            assert_eq!( deref_mut2!( iter,next() ), Some(3) );
+            assert_eq!( deref_mut2!( iter,next() ), Some(4) );
+            assert_eq!( deref_mut2!( iter,next() ), Some(5) );
+            assert_eq!( deref_mut2!( iter,next() ), None    );
         }
     }
 }

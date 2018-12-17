@@ -4,5 +4,4 @@ members = [
     "enumx_derive",
     "cex",
     "cex_derive",
-    "cex_test",
 ]

@@ -1,6 +1,6 @@
 [package]
 name = "enumx"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "enum", "anonymous", "union", "sum", "ad-hoc" ]
@@ -9,10 +9,10 @@ repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/enumx"
 categories = [ "rust-patterns" ]
 edition = "2018"
-description = "Ad-hoc enum or user-defined enum exchange."
+description = "Anonymous enum in Rust."
 
 [dev-dependencies]
-enumx_derive = "0.2"
+enumx_derive = "^0.2.1"
 
 [features]
-enum17_enum32 = []
+enum32 = []

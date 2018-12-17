@@ -10,7 +10,7 @@ Four crates categorized into the fowllowing sub projects:
 
   See `enumx/README.md` for more.
 
-# CeX, for Concrete Error eXchange, or Checked EXception.
+# CeX, for Checked EXception.
 
   Type definitions in `cex` crate and proc-macro derives in `cex_derive` crate.
 

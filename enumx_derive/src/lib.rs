@@ -15,75 +15,110 @@ use quote::quote;
 use syn::export::Span;
 use syn::{parse_quote, DeriveInput, Generics, Ident};
 
+macro_rules! syntax_error {
+    () => {
+        panic!( "`enum`s deriving `Exchange` should be in the form of \"enum MyEnum { Foo(Type), Bar(AnotherType),... }\"" );
+    }
+}
+
 #[proc_macro_derive( Exchange )]
 pub fn derive_exchange( input: TokenStream ) -> TokenStream {
     let input: DeriveInput = syn::parse( input ).unwrap();
 
     match input.data {
         syn::Data::Enum( ref data ) => {
-            let name_ex = input.ident.clone();
-            let name_fx = input.ident.clone();
-            let name_tx = input.ident.clone();
-            let name_fv = input.ident;
+            let name = &input.ident;
 
-            let named_variant_fx = data.variants.iter().map( |v| v.ident.clone() );
-            let named_variant_tx = data.variants.iter().map( |v| v.ident.clone() );
+            let named_variant_fx = data.variants.iter().map( |v| &v.ident );
+            let named_variant_tx = data.variants.iter().map( |v| &v.ident );
 
             let variant_cnt = data.variants.len();
 
-            let enumx_ex = ident( &format!( "Enum{}", variant_cnt ));
-            let enumx_fx = enumx_ex.clone();
-            let enumx_tx = enumx_fx.clone();
-            let enumx_fv = enumx_fx.clone();
+            let enumx = &ident( &format!( "Enum{}", variant_cnt ));
 
-            let named_enum_fx = (0..variant_cnt).map( |_| name_fx.clone() );
+            let named_enum_fx = (0..variant_cnt).map( |_| name );
             let named_enum_tx = named_enum_fx.clone();
 
-            let unamed_enum_fx = (0..variant_cnt).map( |_| enumx_fx.clone() );
+            let unamed_enum_fx = (0..variant_cnt).map( |_| enumx );
             let unamed_enum_tx = unamed_enum_fx.clone();
 
             let unamed_variant_fx = (0..variant_cnt).map( |index| ident( &format!( "_{}", index )));
             let unamed_variant_tx = unamed_variant_fx.clone();
 
-            let ( impl_generics_ex, ty_generics_ex, where_clause_ex ) = input.generics.split_for_impl();
-            let ( impl_generics_fx, ty_generics_fx, where_clause_fx ) = ( impl_generics_ex.clone(), ty_generics_ex.clone(), where_clause_ex.clone() );
-            let ( impl_generics_tx, ty_generics_tx, where_clause_tx ) = ( impl_generics_fx.clone(), ty_generics_fx.clone(), where_clause_fx.clone() );
-            let ( ty_generics_fv, where_clause_fv ) = ( ty_generics_fx.clone(), where_clause_fx.clone() );
+            let ( ref impl_generics, ref ty_generics, ref where_clause ) = input.generics.split_for_impl();
 
-            let mut generics = input.generics.clone();
-            add_generics( &mut generics, &[ "Variant", "Index" ]);
-            let ( impl_generics_fv, _, _ ) = generics.split_for_impl();
+            let mut generics_vi = input.generics.clone();
+            add_generics( &mut generics_vi, &[ "Variant", "Index" ]);
+            let ( impl_generics_vi, _, _ ) = generics_vi.split_for_impl();
 
-            let clause_fv = where_clause_fv .map( |where_clause_fv| &where_clause_fv.predicates );
+            let mut generics_ix = input.generics.clone();
+            add_generics( &mut generics_ix, &[ "Dest", "Indices" ]);
+            let ( impl_generics_ix, _, _ ) = generics_ix.split_for_impl();
+
+            let clause = where_clause.map( |where_clause| &where_clause.predicates );
+
+            let variant_ty = data.variants.iter().map( |ref v| {
+                if let syn::Fields::Unnamed( ref fields ) = v.fields {
+                    let mut iter = fields.unnamed.iter();
+                    if iter.len() == 1 {
+                        let field = iter.next().unwrap();
+                        return &field.ty;
+                    }
+                }
+                syntax_error!();
+            });
+
+            let enumx_ty: syn::Type = parse_quote!{ #enumx<#(#variant_ty),*> };
+
+            let variant_ty = data.variants.iter().map( |ref v| {
+                if let syn::Fields::Unnamed( ref fields ) = v.fields {
+                    let mut iter = fields.unnamed.iter();
+                    if iter.len() == 1 {
+                        let field = iter.next().unwrap();
+                        return &field.ty;
+                    }
+                }
+                syntax_error!();
+            });
 
             let expanded = quote! {
-                impl #impl_generics_ex Exchange for #name_ex #ty_generics_ex #where_clause_ex {
-                    type EnumX = #enumx_ex #ty_generics_ex;
+                impl #impl_generics Exchange for #name #ty_generics #where_clause {
+                    type EnumX = #enumx_ty;
                 }
 
-                impl #impl_generics_fx From<#enumx_fx #ty_generics_fx> for #name_fx #ty_generics_fx #where_clause_fx {
-                    fn from( src: #enumx_fx #ty_generics_fx ) -> Self {
+                impl #impl_generics From<#enumx_ty> for #name #ty_generics #where_clause {
+                    fn from( src: #enumx_ty ) -> Self {
                         match src {
                             #( #unamed_enum_fx::#unamed_variant_fx(v) => #named_enum_fx::#named_variant_fx(v), )*
                         }
                     }
                 }
 
-                impl #impl_generics_tx From<#name_tx #ty_generics_tx> for #enumx_tx #ty_generics_tx #where_clause_tx {
-                    fn from( src: #name_tx #ty_generics_tx ) -> Self {
-                        match src {
+                impl #impl_generics Into<#enumx_ty> for #name #ty_generics #where_clause {
+                    fn into( self ) -> #enumx_ty {
+                        match self {
                             #( #named_enum_tx::#named_variant_tx(v) => #unamed_enum_tx::#unamed_variant_tx(v), )*
                         }
                     }
                 }
 
-                impl #impl_generics_fv FromVariant<Variant,Index> for #name_fv #ty_generics_fv
-                    where Self                      : From<#enumx_fv #ty_generics_fv>
-                        , #enumx_fv #ty_generics_fv : FromVariant<Variant,Index>
-                        , #(#clause_fv)*
+                impl #impl_generics_vi FromVariant<Variant,Index> for #name #ty_generics
+                    where Self      : From<#enumx_ty>
+                        , #enumx_ty : FromVariant<Variant,Index>
+                        , #(#clause)*
                 {
                     fn from_variant( variant: Variant ) -> Self {
-                        #name_fv::from( #enumx_fv:: #ty_generics_fv::from_variant( variant ))
+                        #name::from( #enumx::<#(#variant_ty),*>::from_variant( variant ))
+                    }
+                }
+
+                impl #impl_generics_ix IntoEnumX<Dest,Indices> for #name #ty_generics
+                    where Self      : Into<#enumx_ty>
+                        , #enumx_ty : IntoEnumX<Dest,Indices>
+                {
+                    fn into_enumx( self ) -> Dest {
+                        let enumx: #enumx_ty = self.into();
+                        enumx.into_enumx()
                     }
                 }
             };
