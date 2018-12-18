@@ -51,7 +51,7 @@ When a checked exception was `throw`ed from the callee, the caller can simply `r
       let mut s = String::new();
       f.read_to_string( &mut s )??;
       let number = s.trim().parse::<u32>()
-                    .may_throw_log( ||log!( "fail in parsing {} to u32", s.trim() ))?; // don't double `?`
+                    .may_throw_log( log!( "fail in parsing {} to u32", s.trim() ))?; // don't double `?`
       Ok( number )
   }
   ```
@@ -97,7 +97,7 @@ When a checked exception was `throw`ed from the callee, the caller can simply `r
   
       a.checked_mul( b )
        .ok_or( MulOverflow(a,b) )
-       .may_throw_log( ||log!( "u32 overflow: {} * {}", a, b ))
+       .may_throw_log( log!( "u32 overflow: {} * {}", a, b ))
        .map( |result| result == c )
   }
   ```
