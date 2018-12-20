@@ -312,7 +312,6 @@ pub enum FooErr{ Code(i32), Text(String) }
 
 pub fn foo( args ) -> Result<T, Cex< FooErr{ Code(i32), Text(String) }>> { 
         throw!( 0xdeadbeef );
-    }
 }
 ```
 
