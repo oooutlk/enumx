@@ -34,7 +34,7 @@ enum AMulBEqCError {
 fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c : &'static str )
     -> Result<bool, Cex<AMulBEqCError>>
 {
-    let a = read_u32( file_a ).may_rethrow_ex()?;
+    let a = read_u32( file_a ).may_rethrow()?;
 
     let b = match read_u32( file_b ) {
         Ok(  value ) => value,
@@ -42,7 +42,7 @@ fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c : &'static s
             if a == 0 {
                 0 // 0 * b == 0, no matter what b is.
             } else {
-                rethrow_log_ex!( cex );
+                rethrow_log!( cex );
             }
         },
     };
@@ -73,7 +73,7 @@ fn test_mix_named_with_adhoc() {
     fn read_u32_throws_named( filename: &'static str )
         -> Result<u32, Cex<AMulBEqCError>>
     {
-        read_u32_throws_adhoc( filename ).may_rethrow_named()
+        read_u32_throws_adhoc( filename ).may_rethrow()
     }
     assert!( read_u32_throws_named("src/test/no_file").is_err() );
 }

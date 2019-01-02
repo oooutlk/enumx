@@ -1,7 +1,9 @@
 use super::*;
 
+mod cex { pub use crate::Cex; }
+
 fn read_u32( filename: &'static str )
-    -> Result<u32, Cex<Enum!( std::io::Error, std::num::ParseIntError )>>
+    -> Result<u32, Throws!( std::io::Error, std::num::ParseIntError )>
 {
     use std::io::Read;
 
@@ -17,7 +19,7 @@ fn read_u32( filename: &'static str )
 struct MulOverflow( u32, u32 );
 
 fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c : &'static str )
-    -> Result<bool, Cex<Enum!( std::io::Error, std::num::ParseIntError, MulOverflow )>>
+    -> Result<bool, Throws!( std::io::Error, std::num::ParseIntError, MulOverflow )>
 {
     let a = read_u32( file_a ).may_rethrow()?;
 
@@ -104,7 +106,7 @@ fn test_backtrace() {
         Log {
             module: "cex::test::adhoc",
             file: "cex/src/test/adhoc.rs",
-            line: 12,
+            line: 14,
             column: 35,
             info: Some(
                 "fail in parsing not-a-number to u32"
@@ -113,7 +115,7 @@ fn test_backtrace() {
         Log {
             module: "cex::test::adhoc",
             file: "cex/src/test/adhoc.rs",
-            line: 30,
+            line: 32,
             column: 17,
             info: None
         }

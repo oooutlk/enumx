@@ -13,7 +13,7 @@ use self::proc_macro::TokenStream;
 use quote::quote;
 
 use syn::export::Span;
-use syn::{parse_quote, DeriveInput, Generics, Ident};
+use syn::{parse_quote, DeriveInput, Ident};
 
 macro_rules! syntax_error {
     () => {
@@ -29,33 +29,23 @@ pub fn derive_exchange( input: TokenStream ) -> TokenStream {
         syn::Data::Enum( ref data ) => {
             let name = &input.ident;
 
-            let named_variant_fx = data.variants.iter().map( |v| &v.ident );
-            let named_variant_tx = data.variants.iter().map( |v| &v.ident );
+            let named_variant_fp = data.variants.iter().map( |v| &v.ident );
+            let named_variant_tp = data.variants.iter().map( |v| &v.ident );
 
             let variant_cnt = data.variants.len();
 
             let enumx = &ident( &format!( "Enum{}", variant_cnt ));
 
-            let named_enum_fx = (0..variant_cnt).map( |_| name );
-            let named_enum_tx = named_enum_fx.clone();
+            let named_enum_fp = (0..variant_cnt).map( |_| name );
+            let named_enum_tp = named_enum_fp.clone();
 
-            let unamed_enum_fx = (0..variant_cnt).map( |_| enumx );
-            let unamed_enum_tx = unamed_enum_fx.clone();
+            let unamed_enum_fp = (0..variant_cnt).map( |_| enumx );
+            let unamed_enum_tp = unamed_enum_fp.clone();
 
-            let unamed_variant_fx = (0..variant_cnt).map( |index| ident( &format!( "_{}", index )));
-            let unamed_variant_tx = unamed_variant_fx.clone();
+            let unamed_variant_fp = (0..variant_cnt).map( |index| ident( &format!( "_{}", index )));
+            let unamed_variant_tp = unamed_variant_fp.clone();
 
             let ( ref impl_generics, ref ty_generics, ref where_clause ) = input.generics.split_for_impl();
-
-            let mut generics_vi = input.generics.clone();
-            add_generics( &mut generics_vi, &[ "Variant", "Index" ]);
-            let ( impl_generics_vi, _, _ ) = generics_vi.split_for_impl();
-
-            let mut generics_ix = input.generics.clone();
-            add_generics( &mut generics_ix, &[ "Dest", "Indices" ]);
-            let ( impl_generics_ix, _, _ ) = generics_ix.split_for_impl();
-
-            let clause = where_clause.map( |where_clause| &where_clause.predicates );
 
             let variant_ty = data.variants.iter().map( |ref v| {
                 if let syn::Fields::Unnamed( ref fields ) = v.fields {
@@ -70,68 +60,26 @@ pub fn derive_exchange( input: TokenStream ) -> TokenStream {
 
             let enumx_ty: syn::Type = parse_quote!{ #enumx<#(#variant_ty),*> };
 
-            let variant_ty = data.variants.iter().map( |ref v| {
-                if let syn::Fields::Unnamed( ref fields ) = v.fields {
-                    let mut iter = fields.unnamed.iter();
-                    if iter.len() == 1 {
-                        let field = iter.next().unwrap();
-                        return &field.ty;
-                    }
-                }
-                syntax_error!();
-            });
-
             let expanded = quote! {
-                impl #impl_generics Exchange for #name #ty_generics #where_clause {
-                    type EnumX = #enumx_ty;
-                }
+                impl #impl_generics enumx::Exchange for #name #ty_generics #where_clause {
+                    type Proto = #enumx_ty;
 
-                impl #impl_generics From<#enumx_ty> for #name #ty_generics #where_clause {
-                    fn from( src: #enumx_ty ) -> Self {
+                    fn from_proto( src: #enumx_ty ) -> Self {
                         match src {
-                            #( #unamed_enum_fx::#unamed_variant_fx(v) => #named_enum_fx::#named_variant_fx(v), )*
+                            #( #unamed_enum_fp::#unamed_variant_fp(v) => #named_enum_fp::#named_variant_fp(v), )*
                         }
                     }
-                }
 
-                impl #impl_generics Into<#enumx_ty> for #name #ty_generics #where_clause {
-                    fn into( self ) -> #enumx_ty {
+                    fn into_proto( self ) -> #enumx_ty {
                         match self {
-                            #( #named_enum_tx::#named_variant_tx(v) => #unamed_enum_tx::#unamed_variant_tx(v), )*
+                            #( #named_enum_tp::#named_variant_tp(v) => #unamed_enum_tp::#unamed_variant_tp(v), )*
                         }
-                    }
-                }
-
-                impl #impl_generics_vi FromVariant<Variant,Index> for #name #ty_generics
-                    where Self      : From<#enumx_ty>
-                        , #enumx_ty : FromVariant<Variant,Index>
-                        , #(#clause)*
-                {
-                    fn from_variant( variant: Variant ) -> Self {
-                        #name::from( #enumx::<#(#variant_ty),*>::from_variant( variant ))
-                    }
-                }
-
-                impl #impl_generics_ix IntoEnumX<Dest,Indices> for #name #ty_generics
-                    where Self      : Into<#enumx_ty>
-                        , #enumx_ty : IntoEnumX<Dest,Indices>
-                {
-                    fn into_enumx( self ) -> Dest {
-                        let enumx: #enumx_ty = self.into();
-                        enumx.into_enumx()
                     }
                 }
             };
             expanded.into()
         },
         _ => panic!( "Only `enum`s can be `Exchange`." ),
-    }
-}
-
-fn add_generics( generics: &mut Generics, names: &[&'static str] ) {
-    for name in names {
-        let name = ident( name );
-        generics.params.push( parse_quote!( #name ));
     }
 }
 

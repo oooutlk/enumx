@@ -1,318 +1,505 @@
 # Summary
 
-Add types, traits, macros and syntactic sugar for working with the `Result` type which models checked exception constructs in error handling.
+Introduce checked exception simulation in Rust, for refining the style of
+putting all error types in a whole enum then using type alias `Result<T>` in
+error-handling.
 
 The new constructs are:
 
-* A `Cex` struct in `Result<T, Cex<Enum!( Err1, Err2, ...)>>` for simulating `throws` in function signatures.
+* `Cex` built upon _structural enum_ from `enumx` crate, and macros/traits for:
 
-* A set of ad-hoc enum notated by `Enum!()` that can be converted to each other if compatible in variant types.
+  - automatic error type convertion
 
-* An optional `??` pseudo operator and its equivalent APIs, names of which start with "throw" or "may_throw", for explicityly propagating "checked exceptions" from a plain error.
+  - throw point tracing and logging
 
-* An optional `???` pseudo operator and its equivalent APIs, names of which start with "rethrow" or "may_rethrow", for explicityly propagating "checked exceptions" from another "checked exception".
+* An optional `cex!{}` macro for syntax support:
 
-# Motivation and overview
+  - `throws` in function signatures
 
-Using `Result` and `?` operator in error handling is very convenient, except for the requirement of handwritten boilerplate code for error type definitions and convertions, or using trait object. We would like to solve it, not to force users to implement "the trait" for their error types, but automatically generate type definitions and convertions.
+  - shorthand notations `~`/`~~` for `.may_throw()`/`.may_rethrow()`.
 
-We can accomplish this by adding constructs which mimic union types and checked exception of other languages, while implement them in typically Rustic fashion. Their meaning can be specified by two existing rust crates, [EnumX](https://crates.io/crates/enumx) and [CeX](https://crates.io/crates/cex), but with some limitations, and a few features are not implemented at the moment.
+# Motivation
 
-These constructs are strict landed in "user mode rust", without any magic in the compiler. Apart from the issue of pseudo operators, the legality and behavior of all currently existing Rust syntax is entirely unaffected.
+A typical style of error-handling is so called ["wrapping errors"](https://doc.rust-lang.org/stable/rust-by-example/error/multiple_error_types/wrap_error.html).
 
-By "checked exceptions", fo now, we essentially just mean a `Cex`'s `error` field that is the `Err` variant of a `Result`. And "plain error" means the variant of an `Enum!()`/`#[derive(Exchange)] enum`.
+The procedure is as follows:
 
-When a checked exception was `throw`ed from the callee, the caller can simply `rethrow`s it, or does actual error handling on `match`ing its variants. If failed again, the caller will `throw` some checked exception which may or may not be the origin one.
+1. Collect all possible error types in a crate and putting them in an enum,
+  perhaps named `Error` defined in `error.rs`, as "the crate's error type". Use
+  `pub type Result<T> = Result<T,Error>` to simplify the function signatures.
 
-## Unconditionally throw/rethrow
+2. Implement `From`s for the crate's error type, to do "up-casting" from actual
+  error types; Maybe implement `std::error::Error` for those actual error types.
 
-  When talking about `throw`, we mean "converting a plain error to a checked exception and do early exit".
+This method has some issues:
 
-  A set of macros for simulating `throw` keywords are `throw!()`, `throw_log!()`, `throw_ex!()` and `throw_log_ex!()`.
+1. Using of type aliased `Result` effectively hide the actual error types,
+  confusing programmers(including the author) when reading code or debugging.
 
-  When talking about `rethrow`, we mean "converting a checked exception to another one and do early exit".
+2. Using of a fat enum as the `Err` for all functions adds unnecessary paths in
+  error-handling, causing potentially inefficiencies.
 
-  A set of macros for simulating `rethrow` keywords are `rethrow!()`, `rethrow_log!()`, `rethrow_ex!()`, `rethrow_log_ex!()`, `rethrow_named!()` and `rethrow_log_named!()`..
+3. Implementing `From`/`Error` trait brings boilerplate code.
 
-## The conditional throw API, and `??` pseudo operator
+# Features
 
-  Similar with using `?` operator to propagating a plain error, `??` propagates a checked exception. 
+The CeX project addresses all these issues listed above with features:
 
-  The following is an example of a function that reads a `u32` value from a file.
+- Enumerating all the possible error types in function signatures.
 
-  ```rust
-  #[cex]
-  fn read_u32( filename: &'static str )
-      -> Result<u32, Cex<Enum!( std::io::Error, std::num::ParseIntError )>>
-  {
-      use std::io::Read;
-  
-      let mut f = std::fs::File::open( filename )??;
-      let mut s = String::new();
-      f.read_to_string( &mut s )??;
-      let number = s.trim().parse::<u32>()
-                    .may_throw_log( log!( "fail in parsing {} to u32", s.trim() ))?; // don't double `?`
-      Ok( number )
-  }
-  ```
+- The users do not need to impl `From`s. If needed, a `#[derive(Exchange)]` is
+  enough.
 
-  The `??` pseudo operator reads as "may throw?", which is activated by the proc-macro attribute `#[cex]`.
+- No mandatory traits for actual error types. They could be or be not an
+  `std::error::Error`, etc. If the user do want mandatory traits, trait bounds
+  are up to the job.
 
-  Its equivalent APIs are `may_throw()?`, `may_throw_log()?`, `may_throw_ex()?` or `may_throw_log_ex()?`.
+- Integrated well with `Result` adaptors and `?`, though some sort of extra
+  annotations may be requried, aka throw/rethrow, `~`/`~~`.
 
-## The conditional rethrow API, and `???` pseudo operator
+- `throws` syntax in principles of ergonomics, with fallbacks to vanilla Rust,
+  to get better IDE support.
 
-  Similar with using `??` pseudo operator to propagating a checked exception from a plain error, `???` propagates a checked exception from another one.
+- Working with stable Rust.
 
-  The following is an example of a function that reads three `u32` values a, b, and c from three files, and checks if a * b == c.
+# Overview
 
-  ```rust
-  #[derive( Debug, PartialEq, Eq )]
-  struct MulOverflow( u32, u32 );
-  
-  #[cex]
-  fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c : &'static str )
-      -> Result<bool, Cex<Enum!( std::io::Error, std::num::ParseIntError, MulOverflow )>>
-  {
-      let a = read_u32( file_a )???;
-  
-      let b = match read_u32( file_b ) {
-          Ok(  value ) => value,
-          Err( cex   ) => {
-              if a == 0 {
-                  0 // 0 * b == 0, no matter what b is.
-              } else {
-                  rethrow_log!( cex );
-              }
-          },
-      };
-   
-      let c = match read_u32( file_c ) {
-          Ok(  value ) => value,
-          Err( cex   ) => match cex.error {
-              Enum2::_0( _   ) => 0, // default to 0 if file is missing.
-              Enum2::_1( err ) => throw!( err ),
-          },
-      };
-  
-      a.checked_mul( b )
-       .ok_or( MulOverflow(a,b) )
-       .may_throw_log( log!( "u32 overflow: {} * {}", a, b ))
-       .map( |result| result == c )
-  }
-  ```
+## Example: wrapping errors
 
-  The `???` pseudo operator reads as "may rethrow?", which is activated by the proc-macro attribute `#[cex]`.
+We will see a program written in the "wrapping errors" style. It reads 3 `u32`
+values a,b,c from 3 files respectively, then checks if they satisfied the
+equation `a * b == c`.
 
-  Its equivalent APIs are `may_rethrow()`, `may_rethrow_log()`, `may_rethrow_ex()`, `may_rethrow_log_ex()`, `may_rethrow_named()` and `may_rethrow_log_named()`.
+```rust
+use std::{ error, fmt, num, io };
+use std::io::Read;
 
-## `throws` in function signatures
+type Result<T> = std::result::Result<T, Error>;
 
-  The two functions listed above are in the form of `#[cex] fn(args) -> Result<T, Cex<Enum!( A, B, C )>>`, which can be translated straightforward to `fn(args) -> T, throws A, B, C` if Rust supports this kind of syntax.
+#[derive( Debug )]
+enum Error {
+    IO( io::Error ),
+    Parse( num::ParseIntError ),
+    Calc( u32, u32 ),
+}
 
-## Ad-hoc enum
+impl fmt::Display for Error {
+    fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
+        match *self {
+            Error::IO( ref e ) => e.fmt( f ),
+            Error::Parse( ref e ) => e.fmt( f ),
+            Error::Calc( a, b ) => {
+                write!( f, "u32 overflow: {} * {}", a, b )
+            },
+        }
+    }
+}
 
-  `Enum!( std::io::Error, std::num::ParseIntError )` produces an ad-hoc enum composed by two variants. Its variants are named as `_0` and `_1`, when referenced later, we can simply use `Enum2::_0` and `Enum2::_1`.
+impl error::Error for Error {
+    fn description( &self ) -> &str {
+        match *self {
+            Error::IO( ref e ) => e.description(),
+            Error::Parse( ref e ) => e.description(),
+            Error::Calc( _, _ ) => "multiplication overflow",
+        }
+    }
 
-  We defines a new error type( a plain error ) `MulOverflow` for function `a_mul_b_eq_c()`. Note that it is not an `enum` but a `struct` without `impl From`s. Plain errors will be summarized by the ad-hoc enum wrapper.
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            Error::IO( ref e ) => Some( e ),
+            Error::Parse( ref e ) => Some( e ),
+            _ => None,
+        }
+    }
+}
 
-## How an checked exception are checked
+impl From<io::Error> for Error {
+    fn from( io_error: io::Error ) -> Error {
+        Error::IO( io_error )
+    }
+}
 
-  A checked exception as the `Cex`'s `error` field are either an ad-hoc enum or a `Exchange`able enum, which must be exhaustively checked in a `match`.
+impl From<num::ParseIntError> for Error {
+    fn from( err: num::ParseIntError ) -> Error {
+        Error::Parse( err )
+    }
+}
 
-## Log and backtracing support
+impl From<(u32,u32)> for Error {
+    fn from( (a,b): (u32,u32) ) -> Error {
+        Error::Calc( a,b )
+    }
+}
 
-  When (re)`throw`ing a checked exception, an optional backtrace information can be logged. The backtrace log includes the module, file, line and column of the throw point, and an optional info string.
+fn read_u32( filename: &'static str ) -> Result<u32> {
+    let mut f = std::fs::File::open( filename )?;
+    let mut s = String::new();
+    f.read_to_string( &mut s )?;
+    let number = s.trim().parse::<u32>()?;
+    Ok( number )
+}
 
-  If we do not want to log anything, use `throw()`, `rethrow()`, `may_throw()`, `may_rethrow()`, and the corresponding ones with "_ex" suffix in their function names.
+fn a_mul_b_eq_c(
+    file_a: &'static str,
+    file_b: &'static str,
+    file_c: &'static str )
+    -> Result<bool>
+{
+    let a = read_u32( file_a )?;
 
-  If we want to track only the throw point but nothing else, use `throw_log( err, log!() )`, `rethrow_log( err, log!() )`, `may_throw_log( err, log!() )`, `may_rethrow_log( err, log!() )`, and the corresponding ones with "_ex" suffix in their function names.
-
-  If we want to track the throw point, and an additional `info`, the format string and the `info` can be put in the arguments of `log!()` macro, which behaves like `std::format!()` but constructs a `Log`.
-
-  An example demonstrating what backtrace looks like:
-
-  ```rust
-      assert_eq!( a_mul_b_eq_c( "src/test/3", "src/test/not_num", "src/test/21" ).map_err( |cex| format!( "{:#?}", cex )),
-                  Err( String::from( r#"Cex {
-      error: _1(
-          ParseIntError {
-              kind: InvalidDigit
-          }
-      ),
-      logs: [
-          Log {
-              module: "cex::test::sugar",
-              file: "cex/src/test/sugar.rs",
-              line: 19,
-              column: 35,
-              info: Some(
-                  "fail in parsing not-a-number to u32"
-              )
-          },
-          Log {
-              module: "cex::test::sugar",
-              file: "cex/src/test/sugar.rs",
-              line: 38,
-              column: 17,
-              info: None
-          }
-      ]
-  }"# ))
-      );
-  ```
-
-## Named checked exception
-
-  It is convenient to write an ad-hoc enum but inconvenient to access its variants via the unreadable names such as `_0`. Named `Exchange`able enum comes to rescue, at the cost of an explicit user-defined type with a `#[derive(Exchange)]` attribute.
-
-  The `read_u32()` and `a_mul_b_eq_c()` examples could be rewriten to use named checked exception:
-
-  ```rust
-  #[ derive( Exchange, Debug )]
-  enum ReadU32Error {
-      IO( std::io::Error ),
-      Parse( std::num::ParseIntError ),
-  }
-  
-  fn read_u32( filename: &'static str ) -> Result<u32, Cex<ReadU32Error>> {
-    /* body omitted */
-  }
-
-  #[derive( Debug, PartialEq, Eq )]
-  struct MulOverflow( u32, u32 );
-  
-  #[ derive( Exchange, Debug )]
-  enum AMulBEqCError {
-      IO( std::io::Error ),
-      Parse( std::num::ParseIntError ),
-      Overflow( MulOverflow ),
-  }
-  
-  fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c : &'static str )
-      -> Result<bool, Cex<AMulBEqCError>>
-  {
-    /* omitted */
-
-    let c = match read_u32( file_c ) {
+    let b = match read_u32( file_b ) {
         Ok(  value ) => value,
-        Err( cex   ) => match cex.error { // variants has readable names
-            ReadU32Error::IO(    _   ) => 0, // default to 0 if file is missing.
-            ReadU32Error::Parse( err ) => throw!( err ),
+        Err( error ) => {
+            if a == 0 {
+                0 // 0 * b == 0, no matter what b is.
+            } else {
+                return Err( error );
+            }
         },
     };
 
-    /* omitted */
-  }
+    let c = match read_u32( file_c ) {
+        Ok(  value ) => value,
+        Err( error ) => match error {
+            Error::IO(     _ ) => 0, // default to 0 if file is missing.
+            Error::Parse(  _ ) => return Err( error ),
+            Error::Calc( _,_ ) => {
+                unreachable!(); // read_u32 does not do calculating at all!
+            },
+        },
+    };
+
+    a.checked_mul( b )
+     .ok_or( Error::Calc(a,b) )
+     .map( |result| result == c )
+}
+```
+
+Things worth noticing:
+
+- The possible error types are hidden by `Result` type alias.
+
+  ```rust
+  fn read_u32( /**/ ) -> Result<u32> { /**/ }
+  fn a_mul_b_eq_c( /**/ ) -> Result<bool> { /**/ }
   ```
 
-  Those `??`/`???` equivalent APIs with a `_ex` name suffix mentioned previously, works for the situation that both callee and caller using named checked exceptions.
+  Programmers are not able to know the actual errors of a certain function by
+  glancing over its signatures, unless they check the call chain recursively. In
+  a real-word project, errors may be propagated through quite deep call stack,
+  and manually checking the errors is infeasible for humans.
 
-  The APIs with a `_named` name suffix mentioned previously, works for the situation that callee using ad-hoc checked exception while caller using named one.
+- The error types are not _accurate_
 
-# Detailed design
+  Although `read_u32()` does not do calculating at all, we need to deal with
+  the `Error::Calc` branch and write `unreachable!()` code.
 
-The checked exception simulation proposed in this article is essentially a filling the blank in "Exception type upcasting" section in [RFC 243](https://github.com/rust-lang/rfcs/blob/master/text/0243-trait-based-exception-handling.md#exception-type-upcasting).
+  ```rust
+  Err( error ) => match error {
+      Error::IO(     _ ) => 0, // default to 0 if file is missing.
+      Error::Parse(  _ ) => return Err( error ),
+      Error::Calc( _,_ ) => {
+          unreachable!(); // read_u32 does not do calculating at all!
+      },
+  },
+  ```
 
-To automatically generate "type upcasting", some kind of "union types" must be implemented. In the upcasting, types are categorized into one of the three:
+  Even worse, any public API returning `Result<T>` will force the downstream
+  users writing such code.
 
-1. variant types
+- Boilerplate code for trait `impl`s.
 
-  - converted to #2 and #3 via `IntoEnum` trait.
+## Example: checked exception
 
-2. ad-hoc `Enum!()` types
+We will rewrite this program in "checked exception" style. The `throws` syntax
+and other syntatic sugar are utilized for demonstration purpose. However, **the
+users are free to pick vanilla Rust equivalents as a fallback.**
 
-  - constructed from #1 via `FromVariant` trait.
-
-  - converted between another one via `FromEnumX`/`IntoEnumX` trait.
-
-  - converted to #3 of the same variant types via standard `From`/`Into` trait.
-
-3. named `Exchange`able types
-
-  - constructed from #1 via `FromVariant` trait.
-
-  - converted to #2 of the same variant types via standard `From`/`Into` trait.
-
-  - converted between another one via `ExchangeFrom`/`ExchangeInto` trait.
-
-All the traits mentioned above utilize phantom `Index`/`Indices` types to do type inferences, for which standard `From`/`Into` traits have no rooms to place in generics. It is the root cause why we distinguish ad-hoc enums with named exchangeable ones, `throw` with `rethrow`, `?` with `??`/`???` etc.
-
-## Throw/Rethrow macros
-
-  They are a thin wrapper of the `Throw`/`Rethrow`'s methods, e.g. `throw!( error )` is `return error.throw()`;
-
-## `??`/`???` pseudo operators and their equivalents
-
-  They combine `map_err()` and `MayThrow`/`MayRethrow`'s methods, e.g. `expr??` or `expr.may_throw_log( log!() )` is `expr.map_err( |err| Cex{ error: err.into_enum(), logs: vec![ log ]})`.
-
-  In order to use `??`/`???`, the user must tag their functions with `#[cex]` attribute. Currently, `expr??` will be translated in `expr.may_throw_log( log!() )` and `expr???` will be translated in `expr.may_rethrow_log( log!() )`.
-
-## Feature gates
-
-  EnumX's feature `enum32` supports enums composed of up to 32 variants. By default enums of up to 16 variants are supported.
-
-# Drawbacks
-
-1. The `??`/`???` pseudo operators change the meaning of exising Rust syntax. However `??` or `???` seems not to be frequent used( if ever used ), and `#[cex]` indicates the change.
-
-2. Although well-defined and clear in their names, the prefix "re" and suffix "ex"/"named" seems verbose and complex, especially for beginners. If we find a way to do type upcasting in the manner of standard `From`/`Into`, they could be omitted for brevity.
-
-3. As mentioned previously, union types in EnumX project does not support enums composed of arbitrary number of variants. By default the maximum is 16, and can be increased to 32.
-
-# Rationale and alternatives
-
-Checked exception simulation in rust have several advantages:
-
-1. keeps users from writing boilerplate code for type definitions and convertions.
-
-2. clear about all the possible error types by checking the function signature.
-
-3. do not force users to `impl` certain trait to work.
-
-The debatable topics on checked exception are:
-
-1. Checked exceptions inappropriately expose the implementation details.
-
-2. Unstable method signatures. 
-
-# Prior art
-
-The EnumX v0.2 is inspired by [`frunk_core::coproduct`](https://docs.rs/frunk_core/0.2.2/frunk_core/coproduct/index.html), which provides another ad-hoc enum implementation.
-
-# Unresolved questions
-
-1. Should or can the type upcasting implemented finally in the manner of standard `From`/`Into`?
-
-The EnumX v0.1 did it this way at the cost of unable to work for enums with generic arguments,while EnumX v0.2 uses phantom index types to work for it at the cost of using `From`/`Into`.
-
-2. Should the union types implemented not in flattern `enum`s but in nested car/cdr manner, similar with `frunk_core::coproduct`?
-
-Nested car/cdr enum can deal with arbitrary variant numbers, at the cost of pattern matching syntax support associated with Rust `enum`.
-
-3. Should the backtrace enabling/disabling at runtime by some environment variable?
-
-# Future possibilities
-
-Add `cex!{}` proc-macro to mimic `throws` keywords and inline type definition.
+- Introducing `throws` in function signatures:
 
 ```rust
+fn read_u32( filename: &'static str ) -> u32
+    throws IO(    std::io::Error )
+         , Parse( std::num::ParseIntError )
+{ /**/ }
+```
+
+```rust
+#[derive( Debug, PartialEq, Eq )]
+pub struct MulOverflow( pub u32, pub u32 );
+
+fn a_mul_b_eq_c(
+    file_a: &'static str,
+    file_b: &'static str,
+    file_c: &'static str )
+    -> bool
+    throws IO(    std::io::Error )
+         , Parse( std::num::ParseIntError )
+         , Calc(  MulOverflow )
+{ /**/ }
+```
+
+We consider `read_u32()` and `a_mul_b_eq_c()` as functions returning checked
+exceptions, aka "cex functions", because they use `throws` in signatures. Those
+who don't, such as `std::fs::File::open()`, are returning plain errors.
+
+- Pattern matching on a cex function's result
+
+As a cex function, `read_u32()` returns a `Result` of which `Err` is
+`read_u32::Err`.
+
+```rust
+let c = match read_u32( file_c ) {
+    Ok(  value ) => value,
+    Err( cex   ) => match cex.error {
+        read_u32::Err::IO( _      ) => 0, // default to 0 if file is missing.
+        read_u32::Err::Parse( err ) => throw!( err ),
+    },
+};
+```
+
+- Annotations for distinguish between functions returning plain errors and ones
+  returning checked exceptions.
+
+  1. Use a postfix `~` to propagate a plain error to a cex function.
+  For exameple, the statement `let mut f = std::fs::File::open( filename )?;`
+  will be rewritten as `let mut f = std::fs::File::open( filename )~?;`
+
+  2. Use a postfix `~~` to propagate checked exceptions to a cex function.
+  For exameple, the statement `let a = read_u32( file_a )?;` will be rewritten
+  as `let a = read_u32( file_a )~~?;`
+
+- Unconditionally throw/rethrow
+
+  1. Use `throw!()` to do early exit with a plain error in cex functions.
+  Instead of `return Err( error )`, we will write `throw!( err )`.
+
+  2. Use `rethrow!()` to do early exit with checked exceptions in cex functions.
+  Instead of `return Err( error )`, we will write `rethrow!( err )`.
+
+  3. Use `throw_log!()` and `rethrow_log!()` when you need to track the throw
+  point or attach extra text in the log.
+
+All the magic syntax support for `throws` and `~`/`~~` are provided by `cex!{}`
+from `cex_derive` crate.
+
+Put it all together:
+
+```rust
+use cex_derive::cex;
+
 cex! {
-    pub fn foo( args ) -> T throws enum FooErr{ Code(i32), Text(String) } { 
-        throw 0xdeadbeef;
+    fn read_u32( filename: &'static str ) -> u32
+        throws IO(    std::io::Error )
+             , Parse( std::num::ParseIntError )
+    {
+        use std::io::Read;
+
+        let mut f = std::fs::File::open( filename )~?;
+        let mut s = String::new();
+        f.read_to_string( &mut s )~?;
+        let number = s.trim().parse::<u32>()
+            .may_throw_log( log!( "fail in parsing {} to u32", s.trim() ))?;
+        Ok( number )
+    }
+}
+
+#[derive( Debug, PartialEq, Eq )]
+pub struct MulOverflow( pub u32, pub u32 );
+
+cex!{
+    fn a_mul_b_eq_c(
+        file_a: &'static str,
+        file_b: &'static str,
+        file_c: &'static str )
+        -> bool
+        throws IO(    std::io::Error )
+             , Parse( std::num::ParseIntError )
+             , Calc(  MulOverflow )
+    {
+        let a = read_u32( file_a )~~?;
+
+        let b = match read_u32( file_b ) {
+            Ok(  value ) => value,
+            Err( cex   ) => {
+                if a == 0 {
+                    0 // 0 * b == 0, no matter what b is.
+                } else {
+                    rethrow_log!( cex );
+                }
+            },
+        };
+ 
+        let c = match read_u32( file_c ) {
+            Ok(  value ) => value,
+            Err( cex   ) => match cex.error {
+                read_u32::Err::IO( _ ) => 0, // default to 0 if file is missing.
+                read_u32::Err::Parse( err ) => throw!( err ),
+            },
+        };
+
+        a.checked_mul( b )
+         .ok_or( MulOverflow(a,b) )
+         .may_throw_log( log!( "u32 overflow: {} * {}", a, b ))
+         .map( |result| result == c )
     }
 }
 ```
 
-will be translated to
+# Desugaring `~`/`~~`
+
+- A `~` not followed by another `~`, is short for `.may_throw()`.
+
+- A `~~` is short for `.may_rethrow()`.
+
+- `may_throw_log()`/`may_rethrow_log()` are similar functions in addition to
+  support logging.
+
+# Desugaring `throws`
+
+A function using `throws`
 
 ```rust
-#[derive(Exchange)]
-pub enum FooErr{ Code(i32), Text(String) }
-
-pub fn foo( args ) -> Result<T, Cex< FooErr{ Code(i32), Text(String) }>> { 
-        throw!( 0xdeadbeef );
+cex! {
+    fn foo( /**/ ) -> Type
+        throws SomeErr( SomeErrType )
+             , AnotherErr( AnotherErrType )
+             /*...*/
+    { /**/ }
 }
+```
+
+is desugared as
+
+```rust
+mod foo {
+    use super::*;
+    use enumx::prelude::*;
+    #[derive( enumx_derive::Exchange, Debug )]
+    pub enum Err {
+        SomeErr( SomeErrType ),
+        AnotherErr( AnotherErrType ),
+        /*...*/
+    }
+}
+
+fn foo( /**/ ) -> Result<Type, Cex<foo::Err>> { /**/ }
+```
+
+Things worth noticing:
+
+- `Debug` trait is mandatory for actural error types when using `cex!{}`.
+
+- `throws` syntax is similar with enum variant definitions, with one limitation
+  that all variant type should be "newtype form".
+
+# Issues with `throws` syntax
+
+- Assumes that a `mod` with the same name not defined.
+
+- Potentially poor IDE support.
+
+- Implicit `Result` type.
+
+Alternatives will be discussed in the following sections, to address these
+issues in situations that they really matter.
+
+# Named checked exception
+
+While `cex!{}` generates an enum definition for users, they have the chance to
+define it themselves. For example, if the `mod` with the same name as the cex
+function has already be defined, the user should avoid using `cex!{}`.
+
+```rust
+#[ derive( Exchange, Debug )]
+enum ReadU32Error {
+    IO( std::io::Error ),
+    Parse( std::num::ParseIntError ),
+}
+
+fn read_u32( filename: &'static str )
+    -> Result<u32, Cex<ReadU32Error>>
+{ /**/ }
+```
+
+```rust
+let c = match read_u32( file_c ) {
+    Ok(  value ) => value,
+    Err( cex   ) => match cex.error {
+        ReadU32Error::IO( _ ) => 0, // default to 0 if file is missing.
+        ReadU32Error::Parse( err ) => throw!( err ),
+    },
+};
+```
+
+However, the error types are not listed in signatures now. But the user can
+still be able to check the corresponding enum definition to get them.
+
+The complete code is in
+["named" test case](https://github.com/oooutlk/enumx/blob/master/cex/src/test/named.rs).
+
+# Unnamed checked exception
+
+If the users are not willing to write an enum definition, they can use
+predefined enums as an alternative.
+
+```rust
+fn read_u32( filename: &'static str )
+    -> Result<u32, Throws!( std::io::Error, std::num::ParseIntError )>
+{ /**/ }
+```
+
+However, the pattern matching is less ergonomics because the users have to
+count the errors themselves. And pattern matching is subject to the order of
+error definition.
+
+```rust
+let c = match read_u32( file_c ) {
+    Ok(  value ) => value,
+    Err( cex   ) => match cex.error {
+        Enum2::_0( _   ) => 0, // default to 0 if file is missing.
+        Enum2::_1( err ) => throw!( err ),
+    },
+};
+```
+
+The complete code is in
+["adhoc" test case](https://github.com/oooutlk/enumx/blob/master/cex/src/test/adhoc.rs).
+
+For users not willing to use any macro, `read_u32()` could be rewritten as:
+
+```rust
+fn read_u32( filename: &'static str )
+    -> Result<u32, Cex<Enum2< std::io::Error, std::num::ParseIntError >>>
+{ /**/ }
+```
+
+# Ok-wrapping
+
+To address the issue of implicitly returning `Result`, some kind of ok-wrapping
+mechanism could be implemented in library. However, I wonder if it is really
+helpful for end users and worth writing hundreds lines of code to implement.
+
+# Guildlines for interacting with other libraries
+
+1. If other libraries do not use cex, their error types ar considered as plain
+errors. Use `throw`/`~` and similar constructs to deal with them.
+
+2. If other libraries use cex, their error types ar considered as checked
+exceptions. Use `rethrow`/`~~` and similar constructs to deal with them.
+
+3. Use checked exceptions as constriants in public API. Changes in checked
+exceptions returned by your APIs must break the downstream's code to notice
+the changes. If backward compatibility should be guaranteed, use
+`#[non_exhausted]` with your enums to enforce an `_` match arm in client code.
+
+# Future possibilities
+
+A conservative syntax may be introduced as an alternative of `throws`.
+
+```rust
+#[cex]
+fn foo( /**/ ) -> Result<Type, Throws!( Bar(BarType), Baz(BazType) )> { /**/ }
 ```
 
 # License

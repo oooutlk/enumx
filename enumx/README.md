@@ -1,70 +1,56 @@
 # Summary
 
-Add types, traits, macros for providing structural enum types in Rust.
+Add macros and traits, for minimal support of structural enums.
 
 The new constructs are:
 
-* An `Enum!(T0,T1..)` macro to define a structrual enum type composed of variant types T0,T1.. etc.
+* Four traits `FromVariant`, `IntoEnum`, `ExchangeFrom`, `ExchangeInto`.
 
-* A set of predefined `enum` types with the names `Enum0`, `Enum1`,.. etc to notate the structural enums of different amount of variants.
+* A new proc-macro derive `Exchange` applicable for `enum`s, generating type
+convertion `impl`s defined in these four traits.
 
-* An `Exchange` trait for deriving user-defined sructural `enum` types.
+* A declarative macro `Enum!` accessing to predefined `Exchange`able enum.
+
+In client code, write the following
+
+```rust
+use enumx::Enum;
+use enumx::prelude::*;
+```
+
+to use the constructs mentioned above.
 
 # Motivation
 
-By definition, structural enum types can be converted to each ohter if their variant types are compatible. If provided, they will help programmers to directly express a sum type concept and keep them from hand-writing or macro-generating boilerplate code for convertion `impl`s.
+An enum can be utilized to express a set of finite, known elements. Enums
+composed of variants that do not refer to domain knowledge are considered as
+structural enums. They serve as a mechanism of code organisations.
 
-One of an important use cases, putting error types in function signatures, aka `throws`, will be discussed in its own thread.
+Full-fledged structural enums provide mechanisms not only for gathering values
+of variants into enums, but also for gathering variants of an structural enum,
+into another one.
+
+Such a mechanism is not available in Rust, requiring Rustaceans to implement it
+themselves when needed.
+
+While it is easy to write maros for "variants => enum" gathering, a general
+"enum => enum" convertion is non-trival to implement.
+
+These facts have caused some unfavorable results:
+
+- Programmers are developing such non-trival equivalents in specific domains. A
+  notable example is ["error-chain"](https://crates.io/crates/error-chain). It
+  had reinvented the wheel for some kind of structural enum, aka `ErrorKind`.
+
+- Tempting to use `trait` object instead, in cases which structural `enum` is
+  most suitable for.
+
+This library addresses these issues by inroducing a minimum support of
+structural enums, aka exchangeable enums.
 
 # Overview
 
-## Definition of structrual enum type
-
-A structural enum type of n variant types is notated as `Enum!( T0, T1, .., T(n-1) )`, the actual type name of which is `Enum$n<T0,T1,..,T(n-1)>`, while `$n` means the digit number n appended to `Enum` as a complete identity. Its variants are named as `_0`, `_1`, .. `_(n-1)`. The first variant can be pattern matched as `<Enum!( T0, T1, .., T(n-1) )>::_0` or `Enum$n::_0`, and so forth.
-
-For example, `Enum!( i32, &'static str )` is a structural enum type of 2 variants, which is essentially `Enum2<i32,&'static str>`. Two of its variants are `Enum2::_0` and `Enum2::_1`.
-
-`Enum0` is also defined as a never type.
-
-## Construct a structrual enum
-
-It is obvious that any variant can be converted to the structral enum type containing it.
-
-* Type annotation
-```rust
-let enum2: Enum!(i32,&'static str) = 42.into_enum();
-```
-
-* Type inference
-```rust
-let enum2 = <Enum!(i32,&'static str)>::from_variant( 42 );
-```
-
-## Convertion between structrual enums
-
-A structural enum could be converted to another one, if all its variants are in the latter.
-
-For example, `Enum!(i32,&'static str)` could be converted to `Enum!(&'static str,i32)`, `Enum!(i32,bool,&'static str)`, but not `Enum!(u32,&'static str)` nor `Enum!(i32,String)`.
-
-* Type annotation
-```rust
-let enum2: Enum!(i32,&static str) = 42.into_enum();
-let enum2: Enum!(&'static str,i32) = enum2.into_enumx();
-let enum3: Enum!(i32,bool,&'static str) = enum2.into_enumx();
-```
-
-* Type inference
-```rust
-let enum2 = <Enum!(i32,&static str)>::from_variant( 42 );
-let enum2 = <Enum!(&'static str,i32)::from_enumx( enum2 );
-let enum3 = <Enum!(i32,bool,&'static str)::from_enumx( enum2 );
-```
-
-## Define a user-defined structrual enum 
-
-A user-defined structrual enum should be tagged with `#[derive(Exchange)]`, and is able to be exchanged with others of compatible variant types.
-
-To distinguish a user-defined structrual enum from `Enum!()`, , by now, we call the former "exchangeable enum", and the latter "ad-hoc enum".
+An enum with `#[derive(Exchange)]` is considered as an exchangeable enum.
 
 ```rust
 #[derive(Exchange)]
@@ -72,242 +58,259 @@ enum Info {
     Code(i32),
     Text(&'static str),
 }
+```
 
+An exchangeable enum can be constructed from one of its variants:
+
+```rust
+let info: Info = 42.into_enum();
+let info = Info::from_variant(42);
+```
+
+An exchangeable enum can be exchanged from/into another exchangeable one, as
+long as one has all the variant types appearing in the other one's definition.
+
+```rust
 #[derive(Exchange)]
 enum Data {
-    Code(i32),
+    Num(i32),
     Text(&'static str),
     Flag(bool),
 }
 
-#[derive(Exchange)]
-enum Datum {
-    Code(u32),
-    Text(String),
-    Flag(bool),
-}
-```
-
-## Construct a exchangeable enum
-
-It is obvious that any variant can be converted to the exchangeable enum containing it.
-
-* Type annotation
-```rust
-let info: Info = 0xdeadbeef.into_enum();
-```
-
-* Type inference
-```rust
-let info = Info::from_variant( 0xdeadbeef );
-```
-
-## Convertion between exchangeable enums
-
-A exchangeable enum could be converted to another one, if all its variants are in the latter.
-
-For example, `Info` could be converted to `Data`, but not `Datum`.
-
-* Type annotation
-```rust
-let info: Info = 0xdeadbeaf.into_enum();
+let info: Info = 42.into_enum();
 let data: Data = info.exchange_into();
+
+let info = Info::from_variant(42);
+let data = Data::exchange_from(info);
 ```
 
-* Type inference
-```rust
-let info = Info::from_variant( 0xdeadbeaf );
-let data = Data::exchange_from( info );
-```
+## Enum methods
 
-# Detailed Design
+By now, we call `from_variant()`, `into_enum()`, `exchange_from()`,
+`exchange_into()`as enum exchange methods.
 
-## Predefined ad-hoc enum types
+## Syntax limits of exchangeable enum
 
-A set of predefined `enum` types with the names `Enum0`, `Enum1`,.. are defined in the form of:
+All variants must be in the form of "newtype".
 
 ```rust
-pub enum Enum0 {}
-pub enum Enum1<T0> { _0(T0) }
-pub enum Enum2<T0,T1> { _0(T0), _1(T1) }
-/* omitted */
-```
-
-## Translating `Enum!()` to the actual ad-hoc enum type
-
-The purpose for `Enum!()` is to keep programmers from manually counting variants to pick the right number as a suffix to `Enum`.
-
-It could be implemented as a declarative macro, counting its arguments to find the corresponding predefined enum type:
-
-```rust
-macro_rules! Enum {
-    ( $t0:ty ) => { Enum1<$t0> };
-    ( $t0:ty, $t1:ty ) => { Enum2<$t0,$t1> };
-    ( $t0:ty, $t1:ty, $t2:ty ) => { Enum3<$t0,$t1,$t2> };
-    /* omitted */
+#[derive(Exchange)]
+enum Info {
+    Text(String),  // ok, it is newtype
+    Code(i32,u32), // compile error
 }
 ```
 
-## Type convertion implementations NOT to use `From`
+should cause an error:
 
-This is the most interesting part in implementation. In general, we cannot generate such implementations by implementing `std::convert::From` trait, due to the potential overlapping of `impl`s, which is not allowed in Rust. Simple demonstration of convertion between two `Enum2`s:
-
-```rust
-impl<T0,T1,U0,U1> From<Enum2<T0,T1>> for Enum2<U0,U1> { /* omitted */ }
+```text
+1926 | Code(i32,u32),
+     | ^^^^^^^^^^^^^ all variants of an exchangeable enum must be newtype
 ```
 
-If T0 equals to U0 and T1 equals to U1, we are doing `impl From<T> for T` now, which will result in compiler error. Further more, we are going to meet this again and again no matter what tricks we play as long as sticking in `impl From` for generic types.
+## Predefined exchangeable enums
 
-A sound method is developing our own traits rather than using standard `From` trait to do the convertion. These traits should be able to encode structural information to map variant(s) to its(their) proper positions.
+The `Enum!( T0, T1, .. )` macro defines an predefined exchangeable enum composed
+of variant types T0, T1, .. etc.
 
-What we need to do is to check the equality of types in trait bounds, which is not directly supported in Rust. We should do some transformations to make rustc happy.
-
-## The phantom index
-
-We will introduce a ZST named `Nil`, a set of index types which are ZSTs and named as `V0`,`V1`,.., `V(n-1)` to reflect the position of the type list `T0,T1,..,T(n-1)`, and a recursive struct `pub struct LR<L,R>( pub L, pub R );`, to transform the positions as a "cons of car/cdr": `LR(V0, LR(V1, .. LR(V(n-1),Nil))..)`.
-
-## Construct a structrual enum
-
-We will introduce two traits: `FromVariant<Variant,Index>` and `IntoEnum<Enum,Index>`:
 ```rust
-pub trait FromVariant<Variant,Index> {
-    fn from_variant( variant: Variant ) -> Self;
-}
-
-pub trait IntoEnum<Enum,Index> {
-    fn into_enum( self ) -> Enum;
-}
+let info = <Enum!(i32,&'static str)>::from_variant(42);
 ```
 
-And a blanket `impl`:
+is essentially equvalent to the following:
+
 ```rust
-impl<Enum,Variant,Index> IntoEnum<Enum,Index> for Variant
-    where Enum: FromVariant<Variant,Index>
-{
-    fn into_enum( self ) -> Enum { FromVariant::<Variant,Index>::from_variant( self )}
+let info = __Enum2::from_variant(42);
+```
+
+while `__Enum2` is predefined but **may not exposed to programmers**:
+
+```rust
+#[derive(Exchange)]
+enum __Enum2 {
+    _0(i32),
+    _1(&'static str),
 }
 ```
 
-Mapping a variant to the enum can be done in a [declarative macro](https://github.com/oooutlk/enumx/blob/master/enumx/src/lib.rs#L93).
+Two `Enum!()`s with identical variant type list are identical types.
 
-## Convertion between structrual enums
+`<Enum!( T0, T1, .. )>::_0` for the first variant in pattern matching, and so
+forth.
 
-We will introduce two traits: `IntoEnumX<Dest,Indices>` and `FromEnumX<Src,Indices>`:
 ```rust
-pub trait IntoEnumX<Dest,Indices> {
-    fn into_enumx( self ) -> Dest;
-}
-
-pub trait FromEnumX<Src,Indices> {
-    fn from_enumx( src: Src ) -> Self;
+match info {
+    <Enum!(i32,&'static str)>::_0(_i) => (),
+    <Enum!(i32,&'static str)>::_1(_s) => (),
 }
 ```
 
-And a blanket `impl`:
+Predefined enums are also `Exchange`able enums. They are considered as unnamed
+exchangeable enums, while user-defined ones are called named exchangeable enums.
+
+An unnamed exchangeable enum is suitable in such usescases that an structural
+enum does not worth a name, while a named exchangeable enum serves for those do
+worth naming. 
+
+From now on, we will prefer using predefined enums in examples, since they are
+superior as notations, comparing to user-defined enums.
+
+## Convertion rules
+
+The following 2 rules are considered as the minimum support of structural enum:
+
+1. variant <=> exchangeable enum
+
+  `from_variant()`/`into_enum()` serve for it.
+
+2. exchangeable enum => exchangeable enum composed of equal or more variants
+
+  `exchange_from()`/`exchange_into()` serve for it.
+
+The following rules are considered perculiar to exchangeable enums, which
+distinguish them from "union types" in Typed Racket.
+
+1. An exchangeable enum composed of duplicated variant types is a valid enum,
+but it is nonsense because acual uses of its enum exchange methods will cause
+compile errors.
+
+```text
+9 | let a = <Enum!(i32,i32)>::_0( 3722 );
+  |         ^^^^^^^^^^^^^^^^ variants of an exchangeable enum must be unique.
+```
+
+2. No automatic flattening
+
+  For example, `Enum!(A,Enum!(B,C))` can not be converted to `Enum!(A,B,C)` via
+  enum exchange methods. Further more, making these two equal types will need
+  changes in type systems, which is not possible for a proc-macro derive.
+
+# Detailed design
+
+The definition of enum exchange traits are as following:
+
 ```rust
-impl<Src,Dest,Indices> FromEnumX<Src,Indices> for Dest
-    where Src: IntoEnumX<Dest,Indices>
-{
-    fn from_enumx( src: Src ) -> Self { src.into_enumx() }
+pub trait FromVariant<Variant,Index,Kind> {
+    fn from_variant(v: Variant) -> Self;
+}
+
+pub trait IntoEnum<Enum,Index,Kind> {
+    fn into_enum(self) -> Enum;
+}
+
+pub trait ExchangeFrom<Src,Indices,Kind> {
+    fn exchange_from(src: Src) -> Self;
+}
+
+pub trait ExchangeInto<Dest,Indices,Kind> {
+    fn exchange_into(self) -> Dest;
 }
 ```
 
-For demonstrating the key idea, the following code snippet is quoted from [EnumX](https://github.com/oooutlk/enumx/blob/master/enumx/src/lib.rs#L162):
+Notice that all traits have phantom types `Index`/`Indices` and `Kind` in
+their generics to hold positional information to help compiler accomplishing
+type inferences and avoid overlapping `impl`s.
 
-```rust
-impl<L,R,T0,$($descent_generics),+,$($dest_generics),+> IntoEnumX<$dest_enum<$($dest_generics),+>,LR<L,R>> for $src_enum<T0,$($descent_generics),+>
-    where $dest_enum<$($dest_generics),+>       : FromVariant<T0,L>
-        , $descent_enum<$($descent_generics),+> : IntoEnumX<$dest_enum<$($dest_generics),+>,R>
-```
+## Distinguish from `std::convert`
 
-`T0` is the first variant type of the source enum.
+Since standard `From`/`Into` does not have such phantom types, it is not
+feasible to implement enum exchange methods in `From`/`Into`. Trying to
+implement in `From` will cause compile error because we need to impl multiple
+`From<Variant>` but the generic `Variant` type in different `impl`s could be of
+the same actual type, resulting in overlapping `impl`s.
 
-What we are doing is essentially check if the dest enum can be constructed from `T0`, and if not, try converting the rest variant types in source enum into the dest.
-The `L` is the first index and the `R` is the rest indices. Notice: the two where clauses are not possible to be true at the same time.
+## Distinguish between `Index` and `Indices`
 
-## Define a user-defined structrual enum 
+Consider the convertion from `Enum!(A,B)` to `Enum!(A,B,Enum!(A,B))`.
 
-We will introduce an `Exchange` trait to reflect the prototype of an exchangeable enum, that is, an ad-hoc enum of the same variant types but renaming the variant names as `_0`,`_1`,.. accordingly.
+Since these two enum types are not equal due to lacking of flattening , there
+are two possible ways for this convertion:
 
-```rust
-pub trait Exchange {
-    type EnumX;
-}
-```
+1. making the former as the third variant of the latter.
 
-For example, the `Exchange::EnumX` of the `Info` defined in previous section is `Enum2<i32,&'static str>`.
+2. matching the former to get an `A` or `B`, then making it as the first or
+  second variant of the latter.
 
-## Construct an exchangeable enum
-
-It is obvious for `#[derive(Exchange)]` to generate `impl Exchange`, `impl From` EnumX, `impl Into` EnumX. All that we need to do is naming/renaming.
-
-To `impl FromVariant<Variant,Index> for ExchangeableEnum`, first convert the variant to `Exchange::EnumX`, then convert it `Into` ExchangeableEnum.
-
-To `impl IntoEnumX<AdhocEnum,Indices> for ExchangeableEnum`, first convert the ExchangeableEnum `Into` `Exchange::EnumX`, then convert it `IntoEnumX` AdhocEnum.
-
-## Convertion between exchangeable enums
-
-We will introduce two traits: `ExchangeFrom<Src,Indices>` and `ExchangeInto<Dest,Indices>`:
-
-```rust
-pub trait ExchangeFrom<Src,Indices> {
-    fn exchange_from( src: Src ) -> Self;
-}
-
-pub trait ExchangeInto<Dest,Indices> {
-    fn exchange_into( self ) -> Dest;
-}
-```
-
-We convert the source enum to its ad-hoc enum, then to the dest's ad-hoc enum, then to the dest enum.
-
-```rust
-impl<Src,SrcAdhoc,Dest,DestAdhoc,Indices> ExchangeFrom<Src,Indices> for Dest
-    where Dest      : Exchange<EnumX=DestAdhoc> + From<DestAdhoc>
-        , Src       : Exchange<EnumX=SrcAdhoc>  + Into<SrcAdhoc>
-        , DestAdhoc : FromEnumX<SrcAdhoc,Indices>
-{
-    fn exchange_from( src: Src ) -> Self {
-        Dest::from( FromEnumX::<SrcAdhoc,Indices>::from_enumx( src.into() ))
-    }
-}
-```
-
-And a blanket trait implementation.
-
-```rust
-impl<Src,Dest,Indices> ExchangeInto<Dest,Indices> for Src
-    where Dest: ExchangeFrom<Src,Indices>
-{
-    fn exchange_into( self ) -> Dest {
-        Dest::exchange_from( self )
-    }
-}
-```
+This is the root cause we distinguish between `FromVariant` and `ExchangeFrom`.
 
 # Drawbacks
 
-1. The various kind of `From`/`Into`-alike traits may confuse users, and losing the chance in the situation that accepts standard `From`/`Into` only.
+- Abusing structural enums in cases that they are not suitable for.
 
-2. Predefined ad-hoc enums are a subset of possible ad-hoc enums. What if the programmer want an ad-hoc enum composed of 65535 variants?
+- Distinguish between `FromVariant` and `ExchangeFrom` will cause extra
+annotations, which may be unnecessary in some usecases.
+
+- As a library mimicing structrual enums, enumx supports a limited count of
+  variants. The default is 16, and can be twisted via environment variable
+  `ENUMX_MAX_VARIANTS`.
 
 # Rationale and alternatives
 
-1. The EnumX v0.2 is inspired by [`frunk_core::coproduct`](https://docs.rs/frunk_core/0.2.2/frunk_core/coproduct/index.html), which provides another ad-hoc enum implementation. It uses the recursive enum as a public interface, getting rid of the variants count limit, at the cost of not supporting native pattern matching syntax on `enum`s. And the enum in recursive form may occupy more spaces than the flattern one proposed by this article. 
+## Misuse: always defining types and their convertions explicitly
 
-2. The EnumX v0.1 generates the convertion in standard `From`/`Into` trait, at the cost of not supporting generics, and heavy hacks in proc-macro attribute `#[enumx]`.
+People misusing this believe it is in such a case that:
+
+1. All types, including structural enums, should have readable names, either
+  handwritten or generated from user-defined macro.
+
+2. Convertions between types should be defined explictly, either handwritten or
+  generated from user-defined macro. They work in the way analogy to `friend`
+  keyword in C++.
+
+People using exchangeable enums believe it is in such a case that:
+
+1. An structural enum may or may not worth a readable name.
+
+2. Convertions between structural enums should be derived from `Exchange`, which
+  works in the way analogy to `pub` keyword.
+
+Always naming an structural enum and generating convertions for it will mislead
+readers considering it being deliberate unless they finish reading all the code.
+
+Take two analogies:
+
+1. What if we are not allowed to use closures and local defined functions, but
+have to use structural structs and functions defined far away from their only
+invokings, for mimicing closures?
+
+2. What if we are not allowed to use `pub`/`pub(crate)`/`pub(super)`, but have
+to explicitly authorize all the possible `friend`s of a certain field?
+
+## Misuse: trait objects
+
+People misusing trait objects believe it is in such a case that:
+
+1. All types, including structural enums, should implement some trait and may be
+  categorized to a hierarchy of traits.
+
+2. All types should be erased, and accesses should be done via public interface.
+
+It is reasonable to use trait objects to express a set of unpredicable elements
+having a set of related methods in a trait. Using it to express a set of
+predicable elements having unrelated functions is possible, but is a concept
+mismatch, which may potentially cause pitfalls:
+
+1. Useless methods in trait.
+
+2. Unnecessary boxing and `'static` lifetime bounds.
+
+3. non-straightforward down-casting.
+
+These are all non-issues for structural enums to express a set of predicable
+elements having unrelated functions.
 
 # Prior art
 
-`frunk_core::coproduct`, and `EnumX` v0.1 just mentioned.
+Concepts similar with structural enum exist in other language. One example is
+union types in Typed Racket. However, it supports more powerful type inferences
+such as `Enum!(A)` => `A`, `Enum!(A,A)` => `Enum!(A)`, `Enum!(A,Enum!(B,C))` =>
+`Enum!(A,B,C)`. All these seems to bring significant changes to Rust internals.
 
-# Unresolved questions
-
-Exchangeable enum is missing `FromEnumX` in the derive. As a result, there is no way to convert an ad-hoc enum to an exchangeable one automatically.
-
-# Future possibilities
-
-Make exchangeable enum a first-class structrual enum type.
+The [`frunk_core`](https://docs.rs/frunk_core/) library provides `coproduct`
+which is similar with ad-hic enums, by which this library is inspired. However
+it aims at generic programming and the coproduct is nested `enum`s, not
+supporting pattern matching.
 
 # License
 

@@ -1,6 +1,6 @@
 [package]
 name = "cex"
-version = "0.2.1"
+version = "0.3.0-alpha"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "exception", "error", "throw", "throws", "ad-hoc" ]
@@ -12,8 +12,8 @@ edition = "2018"
 description = "Checked exception in Rust."
 
 [dependencies]
-enumx = "^0.2.1"
-cex_derive = "^0.2.1"
+enumx = "^0.3.0-alpha"
 
 [dev-dependencies]
-enumx_derive = "^0.2.1"
+enumx_derive = "^0.3.0-alpha"
+cex_derive = "^0.3.0-alpha"

@@ -3,7 +3,8 @@
 
 //! Checked exception simulation in Rust.
 
-pub use enumx::*;
+pub use enumx::Enum;
+pub use enumx::prelude::*;
 
 pub type Logs = Vec<Log>;
 
@@ -16,68 +17,40 @@ pub struct Cex<Enum> {
 }
 
 impl<Enum> Cex<Enum> {
-    pub fn new<Error,Index>( err: Error, logs: Logs ) -> Self
-        where Error: IntoEnum<Enum,Index>
+    pub fn new<Error,Index,Kind>( err: Error, logs: Logs ) -> Self
+        where Error: IntoEnum<Enum,Index,Kind>
     {
         Cex{ error: err.into_enum(), logs }
     }
 
-    pub fn append( mut self, log: Log ) -> Self {
+    pub fn rethrow<T,Dest,Indices,Kind>( self ) -> Result<T,Cex<Dest>>
+        where Enum: ExchangeInto<Dest,Indices,Kind>
+    {
+        Err( Cex{ error: self.error.exchange_into(), logs: self.logs })
+    }
+
+    pub fn rethrow_log<T,Dest,Indices,Kind>( mut self, log: Log ) -> Result<T,Cex<Dest>>
+        where Enum: ExchangeInto<Dest,Indices,Kind>
+    {
         self.logs.push( log );
-        self
-    }
-}
-
-impl<Src,Dest,Indices> IntoEnumX<Cex<Dest>,Indices> for Cex<Src>
-    where Src : IntoEnumX<Dest,Indices>
-{
-    fn into_enumx( self ) -> Cex<Dest> {
-        Cex {
-            error : self.error.into_enumx(),
-            logs  : self.logs,
-        }
-    }
-}
-
-impl<Src,Dest,Indices> ExchangeFrom<Cex<Src>,Indices> for Cex<Dest>
-    where Dest: ExchangeFrom<Src,Indices>
-{
-    fn exchange_from( src: Cex<Src> ) -> Self {
-        Cex {
-            error  : <Dest as ExchangeFrom<Src,Indices>>::exchange_from( src.error ),
-            logs : src.logs,
-        }
+        Err( Cex{ error: self.error.exchange_into(), logs: self.logs })
     }
 }
 
 /// Converts a plain error to a checked exception
 pub trait Throw<Enum> {
     #[inline( always )]
-    fn throw<T,Index>( self ) -> Result<T,Cex<Enum>>
-        where Self : Sized + IntoEnum<Enum,Index>
+    fn throw<T,Index,Kind>( self ) -> Result<T,Cex<Enum>>
+        where Self : Sized + IntoEnum<Enum,Index,Kind>
     {
         Err( Cex{ error: self.into_enum(), logs: Vec::new() })
     }
 
     #[inline( always )]
-    fn throw_log<T,Index>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where Self : Sized + IntoEnum<Enum,Index>
+    fn throw_log<T,Index,Kind>( self, log: Log ) -> Result<T,Cex<Enum>>
+        where Self : Sized + IntoEnum<Enum,Index,Kind>
     {
         Err( Cex{ error: self.into_enum(), logs: vec![ log ]})
-    }
-
-    #[inline( always )]
-    fn throw_ex<T,Indices>( self ) -> Result<T,Cex<Enum>>
-        where Self : Sized + ExchangeInto<Enum,Indices>
-    {
-        Err( Cex{ error: self.exchange_into(), logs: Vec::new() })
-    }
-
-    #[inline( always )]
-    fn throw_log_ex<T,Indices>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where Self : Sized + ExchangeInto<Enum,Indices>
-    {
-        Err( Cex{ error: self.exchange_into(), logs: vec![ log ]})
     }
 }
 
@@ -88,130 +61,54 @@ pub trait MayThrow<T,E>
     where Self : Into<Result<T,E>>
 {
     #[inline( always )]
-    fn may_throw<Enum,Index>( self ) -> Result<T,Cex<Enum>>
-        where E : IntoEnum<Enum,Index>
+    fn may_throw<Enum,Index,Kind>( self ) -> Result<T,Cex<Enum>>
+        where E : IntoEnum<Enum,Index,Kind>
     {
         self.into().map_err( |err| Cex{ error: err.into_enum(), logs: Vec::new() })
     }
 
     #[inline( always )]
-    fn may_throw_log<Enum,Index>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where E : IntoEnum<Enum,Index>
+    fn may_throw_log<Enum,Index,Kind>( self, log: Log ) -> Result<T,Cex<Enum>>
+        where E : IntoEnum<Enum,Index,Kind>
     {
         self.into().map_err( |err| Cex{ error: err.into_enum(), logs: vec![ log ]})
     }
 }
 
-impl<T,E> MayThrow<T,E> for Result<T,E> {}
-
-/// Converts a checked exception to another one.
-pub trait Rethrow<Enum> : Sized {
-    #[inline( always )]
-    fn rethrow<T,Indices>( self ) -> Result<T,Cex<Enum>>
-        where Self : IntoEnumX<Cex<Enum>,Indices>
-    {
-        Err( self.into_enumx() )
-    }
-
-    #[inline( always )]
-    fn rethrow_log<T,Indices>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where Self : IntoEnumX<Cex<Enum>,Indices>
-    {
-        Err( self.into_enumx().append( log ))
-    }
-
-    #[inline( always )]
-    fn rethrow_ex<T,Indices>( self ) -> Result<T,Cex<Enum>>
-        where Self: ExchangeInto<Cex<Enum>,Indices>
-    {
-        Err( self.exchange_into() )
-    }
-
-    #[inline( always )]
-    fn rethrow_log_ex<T,Indices>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where Cex<Enum> : ExchangeFrom<Self,Indices>
-    {
-        Err( <Cex<Enum> as ExchangeFrom<Self,Indices>>::exchange_from( self ).append( log ))
-    }
-
-    #[inline( always )]
-    fn rethrow_named<T,Indices>( self ) -> Result<T,Cex<Enum>>
-        where Enum                      : Exchange + From<<Enum as Exchange>::EnumX>
-            , <Enum as Exchange>::EnumX : FromEnumX<Self,Indices>
-    {
-        Err( Cex{ error: <Enum as Exchange>::EnumX::from_enumx( self ).into(), logs: Vec::new() })
-    }
-
-    #[inline( always )]
-    fn rethrow_log_named<T,Indices>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where Enum                      : Exchange + From<<Enum as Exchange>::EnumX>
-            , <Enum as Exchange>::EnumX : FromEnumX<Self,Indices>
-    {
-        Err( Cex{ error: <Enum as Exchange>::EnumX::from_enumx( self ).into(), logs: vec![ log ]})
-    }
-}
-
-impl<SrcCex,Enum> Rethrow<Enum> for SrcCex {}
+impl<Res,T,E> MayThrow<T,E> for Res where Res: Into<Result<T,E>> {}
 
 /// Converts a result containing a checked exception to a result containing another one.
-pub trait MayRethrow<T,E>
-    where Self : Into<Result<T,Cex<E>>>
+pub trait MayRethrow<T,Src>
+    where Self : Into<Result<T,Cex<Src>>>
 {
     #[inline( always )]
-    fn may_rethrow<Enum,Indices>( self ) -> Result<T,Cex<Enum>>
-        where Cex<E> : IntoEnumX<Cex<Enum>,Indices>
+    fn may_rethrow<Dest,Indices,Kind>( self ) -> Result<T,Cex<Dest>>
+        where Src : ExchangeInto<Dest,Indices,Kind>
     {
-        self.into().map_err( |cex| cex.into_enumx() )
+        self.into().map_err( |cex| Cex{ error: cex.error.exchange_into(), logs: cex.logs })
     }
 
     #[inline( always )]
-    fn may_rethrow_log<Enum,Indices>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where Cex<E> : IntoEnumX<Cex<Enum>,Indices>
+    fn may_rethrow_log<Dest,Indices,Kind>( self, log: Log ) -> Result<T,Cex<Dest>>
+        where Src : ExchangeInto<Dest,Indices,Kind>
     {
-        self.into().map_err( |mut cex| { cex.logs.push( log ); cex.into_enumx() })
-    }
-
-    #[inline( always )]
-    fn may_rethrow_ex<Dest,Indices>( self ) -> Result<T,Cex<Dest>>
-        where Cex<Dest> : ExchangeFrom<Cex<E>,Indices>
-    {
-        self.into().map_err( |cex| Cex::<Dest>::exchange_from( cex ))
-    }
-
-    #[inline( always )]
-    fn may_rethrow_log_ex<Dest,Indices>( self, log: Log ) -> Result<T,Cex<Dest>>
-        where Cex<Dest> : ExchangeFrom<Cex<E>,Indices>
-    {
-        self.into().map_err( |mut cex| { cex.logs.push( log ); Cex::<Dest>::exchange_from( cex )})
-    }
-
-    #[inline( always )]
-    fn may_rethrow_named<Dest,Indices>( self ) -> Result<T,Cex<Dest>>
-        where Dest                      : Exchange + From<<Dest as Exchange>::EnumX>
-            , <Dest as Exchange>::EnumX : FromEnumX<E,Indices>
-    {
-        self.into().map_err( |cex| Cex{ error: <Dest as Exchange>::EnumX::from_enumx( cex.error ).into(), logs: cex.logs })
-    }
-
-    #[inline( always )]
-    fn may_rethrow_log_named<Dest,Indices>( self, log: Log ) -> Result<T,Cex<Dest>>
-        where Dest                      : Exchange + From<<Dest as Exchange>::EnumX>
-            , <Dest as Exchange>::EnumX : FromEnumX<E,Indices>
-    {
-        self.into().map_err( |mut cex| { cex.logs.push( log ); Cex{ error: <Dest as Exchange>::EnumX::from_enumx( cex.error ).into(), logs: cex.logs }})
+        self.into().map_err( |mut cex| {
+            cex.logs.push( log );
+            Cex{ error: cex.error.exchange_into(), logs: cex.logs }
+        })
     }
 }
 
-impl<T,E> MayRethrow<T,E> for Result<T,Cex<E>> {}
+impl<Res,T,Src> MayRethrow<T,Src> for Res where Res: Into<Result<T,Cex<Src>>> {}
 
 /// A struct for tracing the propagation of the error.
 #[derive( Debug,PartialEq,Eq,PartialOrd,Ord )]
 pub struct Log {
-    pub module   : &'static str,
-    pub file     : &'static str,
-    pub line     : u32,
-    pub column   : u32,
-    pub info     : Option<String>,
+    pub module : &'static str,
+    pub file   : &'static str,
+    pub line   : u32,
+    pub column : u32,
+    pub info   : Option<String>,
 }
 
 impl Log {
@@ -242,17 +139,6 @@ macro_rules! throw_log {
 }
 
 #[macro_export]
-macro_rules! throw_ex {
-    ( $expr:expr ) => { return $expr.throw_ex(); }
-}
-
-#[macro_export]
-macro_rules! throw_log_ex {
-    ( $expr:expr, $($arg:tt)+ ) => { return $expr.throw_log_ex( log!( $($arg)+ )); };
-    ( $expr:expr ) => { return $expr.throw_log_ex( log!() ); };
-}
-
-#[macro_export]
 macro_rules! rethrow {
     ( $expr:expr ) => { return $expr.rethrow(); }
 }
@@ -264,14 +150,8 @@ macro_rules! rethrow_log {
 }
 
 #[macro_export]
-macro_rules! rethrow_ex {
-    ( $expr:expr ) => { return $expr.rethrow_ex(); }
-}
-
-#[macro_export]
-macro_rules! rethrow_log_ex {
-    ( $expr:expr, $($arg:tt)+ ) => { return $expr.rethrow_log_ex( log!( $($arg)+ )); };
-    ( $expr:expr ) => { return $expr.rethrow_log_ex( log!() ); };
+macro_rules! Throws {
+    ( $($tt:tt)+ ) => { cex::Cex<Enum!($($tt)+)> }
 }
 
 #[cfg( test )]
