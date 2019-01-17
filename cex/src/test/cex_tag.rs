@@ -1,21 +1,29 @@
 use super::*;
 
+use cex_derive::Logger;
+mod cex { pub use crate::{Frame,Logger}; }
+
 #[derive( EnumX, Debug )]
 enum ReadU32Error {
     IO( std::io::Error ),
     Parse( std::num::ParseIntError ),
 }
 
+#[cex]
 fn read_u32( filename: &'static str )
-    -> Result<u32,ReadU32Error>
+    -> Result<u32, ReadU32Error>
 {
     use std::io::Read;
 
-    let mut f = std::fs::File::open( filename ).map_error()?;
+    let mut f = std::fs::File::open( filename )?;
     let mut s = String::new();
-    f.read_to_string( &mut s ).map_error()?;
-    let number = s.trim().parse::<u32>().map_error()?;
-    Ok( number )
+    let read_op: Result<(),std::io::Error> = try {
+        f.read_to_string( &mut s )?; // This `?` is not effected
+    };
+    match read_op {
+        Ok(_) => return Ok( s.trim().parse::<u32>()? ),
+        Err(err) => return err.error(),
+    }
 }
 
 #[derive( Debug, PartialEq, Eq )]
@@ -28,10 +36,11 @@ enum AMulBEqCError {
     Overflow( MulOverflow ),
 }
 
+#[cex]
 fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c: &'static str )
     -> Result<bool, AMulBEqCError>
 {
-    let a = read_u32( file_a ).map_error()?;
+    let a = read_u32( file_a )?;
 
     let b = match read_u32( file_b ) {
         Ok(  value ) => value,
@@ -54,8 +63,8 @@ fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c: &'static st
 
     a.checked_mul( b )
      .ok_or( MulOverflow(a,b) )
+     .map_error()     
      .map( |result| result == c )
-     .map_error()
 }
 
 #[test]
@@ -101,4 +110,64 @@ fn test_a_mul_b_eq_c() {
     assert!( a_mul_b_eq_c( "src/test/0", "src/test/no_file", "src/test/0"  ).ok().unwrap() );
     assert!( a_mul_b_eq_c( "src/test/0", "src/test/not_num", "src/test/0"  ).ok().unwrap() );
     assert!( a_mul_b_eq_c( "src/test/3", "src/test/7",       "src/test/21" ).ok().unwrap() );
+}
+
+use cex_derive::cex;
+
+#[derive( EnumX, Debug, PartialEq, Eq )]
+enum CexErr {
+    Code(i32),
+    Text(&'static str),
+}
+
+#[cex]
+fn misc() -> Result<(),CexErr> {
+    fn bar() -> Result<(),i32> { Err(42)? }
+    let _bar = || -> Result<(),i32> { Ok( bar()? )};
+    let _bar: Result<(),i32> = try { Err(42)? };
+
+    #[cex] fn _baz() -> Result<(),CexErr> { Err(42)? }
+    let _baz = #[cex] || -> Result<(),CexErr> { Ok( bar()? )};
+    let _baz: Result<(),CexErr> = #[cex] try { Err(42)? };
+
+    Err(42)?
+}
+
+#[test]
+fn test_misc() {
+    assert_eq!( misc(), Err( CexErr::Code( 42 )));
+}
+
+mod log_frame {
+    use super::*;
+
+    #[derive( EnumX, Logger, Debug, PartialEq, Eq )]
+    enum CexErr {
+        Code( Log<i32> ),
+        Text( Log<&'static str> ),
+    }
+    
+    #[cex(to_log)]
+    fn _cex_to_log() -> Result<(),CexErr> { Err(42)? }
+    
+    #[cex(log)]
+    fn _cex_log() -> Result<(),CexErr> { Ok( _cex_to_log()? )}
+}
+
+mod log_level {
+    use super::*;
+
+    type Log<E> = super::Log<E, Env<Vec<Frame>>>;
+
+    #[derive( EnumX, Logger, Debug, PartialEq, Eq )]
+    enum CexErr {
+        Code( Log<i32> ),
+        Text( Log<&'static str> ),
+    }
+    
+    #[cex(to_log(( LogLevel::Debug, frame!() )))]
+    fn _cex_to_log() -> Result<(),CexErr> { Err(42)? }
+    
+    #[cex(log(( LogLevel::Info, frame!() )))]
+    fn _cex_log() -> Result<(),CexErr> { Ok( _cex_to_log()? )}
 }

@@ -1,226 +1,233 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
-// Licensed under MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>
+// Licensed under MIT license<LICENSE-MIT or http://opensource.org/licenses/MIT>
+
+//! This crate is the proc-macro implementation for `cex` crate.
+//! It provides `cex::Logger` derive for enum, and `#[cex]` attribute for functions, closures and try blocks.
 
 #![recursion_limit="128"]
 
 extern crate proc_macro;
-use self::proc_macro::TokenStream;
+use self::proc_macro::{TokenStream,TokenTree};
 
 use quote::quote;
 
-use syn::{ Abi, Attribute, Block, FnArg, FnDecl, Generics, Ident, ItemFn, ReturnType, Token, Type, Variant, Visibility, parenthesized, parse_macro_input, parse_quote };
-use syn::parse::{ Parse, ParseStream };
-use syn::punctuated::Punctuated;
-use syn::token::{ self, Async, Comma, Const, Paren, RArrow, Unsafe };
- 
-macro_rules! syntax_err {
-    () => { panic!("A `cex` function should use `throws` to enumerate all its error types."); }
-}
+use syn::{ DeriveInput, Generics, Ident };
+use syn::export::Span;
 
-struct CexOutput {
-    arrow  : RArrow,
-    ok_ty  : Type,
-    errors : Punctuated<Variant, Comma>,
-}
+use syn::{ Expr, ItemFn, parse_quote };
+use syn::visit_mut::VisitMut;
 
-impl Parse for CexOutput {
-    fn parse( input: ParseStream ) -> syn::parse::Result<Self> {
-        let arrow  : RArrow = input.parse()?;
-        let ok_ty  : Type   = input.parse()?;
-        let throws : Ident  = input.parse()?;
-        if throws.to_string() != "throws" {
-            syntax_err!();
-        }
-
-        let mut errors = Punctuated::<Variant,Comma>::new();
-        loop {
-            errors.push_value( input.parse()? );
-            if input.peek( token::Brace ) {
-                break;
-            }
-            errors.push_punct( input.parse()? );
-        }
-
-        Ok( CexOutput {
-            arrow,
-            ok_ty,
-            errors,
-        })
+macro_rules! syntax_error {
+    () => {
+        panic!( "A type deriving `Logger` should be in the form of \"enum Name { Foo(Type), Bar(AnotherType),... }\"" );
     }
 }
 
-struct CexFn {
-    attrs       : Vec<Attribute>,
-    vis         : Visibility,
-    constness   : Option<Const>,
-    unsafety    : Option<Unsafe>,
-    asyncness   : Option<Async>,
-    abi         : Option<Abi>,
-    ident       : Ident,
-    fn_token    : token::Fn,
-    generics    : Generics,
-    paren_token : Paren,
-    inputs      : Punctuated<FnArg, Comma>,
-    output      : CexOutput,
-    block       : Box<Block>,
-}
+/// Implements `cex::Logger` for an `enum`.
+#[proc_macro_derive( Logger )]
+pub fn derive_logger( input: TokenStream ) -> TokenStream {
+    let input: DeriveInput = syn::parse( input ).unwrap();
 
-impl Parse for CexFn {
-    fn parse( input: ParseStream ) -> syn::parse::Result<Self> {
-        let attrs = input.call( Attribute::parse_outer )?;
-        let vis: Visibility = input.parse()?;
-        let constness: Option<Token![const]> = input.parse()?;
-        let unsafety: Option<Token![unsafe]> = input.parse()?;
-        let asyncness: Option<Token![async]> = input.parse()?;
-        let abi: Option<Abi> = input.parse()?;
-        let fn_token: Token![fn] = input.parse()?;
-        let ident: Ident = input.parse()?;
-        let generics: Generics = input.parse()?;
+    match input.data {
+        syn::Data::Enum( ref data ) => {
+            let name = &input.ident;
+            let variant_cnt = data.variants.len();
+            let enum_name  = (0..variant_cnt).map( |_| name );
+            let enum_name_ = (0..variant_cnt).map( |_| name );
+            let variant_names  = data.variants.iter().map( |v| &v.ident );
+            let variant_names_ = data.variants.iter().map( |v| &v.ident );
 
-        let content;
-        let paren_token = parenthesized!( content in input );
-        let inputs = content.parse_terminated(FnArg::parse)?;
+            let mut impl_generics = input.generics.clone();
+            add_generics( &mut impl_generics, "Agent" );
+            let ( impl_generics, _, _ ) = impl_generics.split_for_impl();
 
-        let output = input.parse()?;
+            let ( _, ty_generics, where_clause ) = input.generics.split_for_impl();
+            let clause = where_clause.map( |where_clause| &where_clause.predicates );
 
-        let block: Box<Block> = input.parse()?;
-
-        Ok( CexFn {
-            attrs,
-            vis,
-            constness,
-            unsafety,
-            asyncness,
-            abi,
-            ident,
-            fn_token,
-            generics,
-            paren_token,
-            inputs,
-            output,
-            block,
-        })
-    }
-}
-
-#[proc_macro]
-pub fn cex( input: TokenStream ) -> TokenStream {
-    fn define_tilde( input: TokenStream ) -> TokenStream {
-        use proc_macro::{TokenTree,Group};
-
-        let mut acc = TokenStream::new();
-        let mut tilde = false;
-        for tt in input {
-            match tt {
-                TokenTree::Group( group ) => {
-                    if tilde {
-                        tilde = false;
+            let variant_ty = data.variants.iter().map( |ref v| {
+                if let syn::Fields::Unnamed( ref fields ) = v.fields {
+                    let mut iter = fields.unnamed.iter();
+                    if iter.len() == 1 {
+                        let field = iter.next().unwrap();
+                        return &field.ty;
                     }
-                    acc.extend( TokenStream::from(
-                        TokenTree::Group( Group::new(
-                            group.delimiter(),
-                            define_tilde( group.stream() )))))
-                },
-                TokenTree::Punct( punct ) => {
-                    if punct.as_char() == '~' {
-                        if tilde {
-                            acc.extend( TokenStream::from( quote!( .may_rethrow() )));
-                            tilde = false;
-                        } else {
-                            tilde = true;
-                        }
-                    } else {
-                        if tilde {
-                            acc.extend( TokenStream::from( quote!( .may_throw() )));
-                            acc.extend( TokenStream::from( TokenTree::Punct( punct )));
-                            tilde = false;
-                        } else {
-                            acc.extend( TokenStream::from( TokenTree::Punct( punct )));
+                }
+                syntax_error!();
+            });
+
+            let expanded = quote! {
+                impl #impl_generics cex::Logger<Agent> for #name #ty_generics
+                    where #(#variant_ty: cex::Logger<Agent>),*
+                        , Agent: LogAgent
+                        , #clause
+                {
+                    fn log( self, item: Agent::Item ) -> Self {
+                        match self {
+                            #( #enum_name::#variant_names( v ) =>
+                                #enum_name_::#variant_names_( cex::Logger::<Agent>::log( v, item )),
+                            )*
                         }
                     }
-                },
-                _ => {
-                    if tilde {
-                        tilde = false;
-                    }
-                    acc.extend( TokenStream::from( tt ));
-                },
-            }
+                }
+            };
+            expanded.into()
         }
-        if tilde {
-            acc.extend( TokenStream::from( quote!( .may_throw() )));
+        _ => panic!( "Only `enum`s can derive `Logger`." ),
+    }
+}
+
+fn add_generics( generics: &mut Generics, name: &'static str ) {
+    let name = ident( name );
+    generics.params.push( parse_quote!( #name ));
+}
+
+fn ident( sym: &str ) -> Ident {
+    Ident::new( sym, Span::call_site() )
+}
+
+enum CexAttr {
+    Log(    Option<Expr> ),
+    ToLog(  Option<Expr> ),
+    MapErr( Expr ),
+}
+
+struct CexTag {
+    tag  : bool,
+    attr : Option<CexAttr>,
+}
+
+impl CexTag {
+    fn new( tag: bool, attr: Option<CexAttr> ) -> Self {
+        CexTag{ tag, attr }
+    }
+}
+
+enum Given { Raw, Log, MapError }
+
+fn given( expr: &Expr ) -> Given {
+    if let Expr::MethodCall( expr ) = expr {
+        match expr.method.to_string().as_str() {
+            "map_error" => Given::MapError,
+            "map_err_to_log" | "map_err_log" | "map_err" => Given::Log,
+            _ => Given::Raw,
         }
-        acc
+    } else {
+        Given::Raw
+    }
+}
+
+impl VisitMut for CexTag { 
+    fn visit_item_fn_mut( &mut self, item_fn: &mut ItemFn ) {
+        let tag = self.tag;
+        self.tag = false;
+        self.visit_block_mut( &mut *item_fn.block );
+        self.tag = tag;
     }
 
-    let input = define_tilde( input );
+    fn visit_expr_mut( &mut self, expr: &mut Expr ) {
+        match expr {
+            Expr::Try( try_ ) => if self.tag {
+                let try_expr = &mut try_.expr;
+                syn::visit_mut::visit_expr_mut( self, try_expr );
 
-    let CexFn {
-        attrs,
-        vis,
-        constness,
-        unsafety,
-        asyncness,
-        abi,
-        ident,
-        fn_token,
-        generics,
-        paren_token,
-        inputs,
-        output,
-        block,
-    } = parse_macro_input!( input as CexFn );
-
-    let CexOutput {
-        arrow,
-        ok_ty,
-        errors,
-    } = output;
-
-    let variants = errors.iter();
-    let fn_mod = ident.clone();
-    let fn_mod_ = fn_mod.clone();
-    let ret_ty: Type = parse_quote! {
-        Result<#ok_ty, Cex<#fn_mod::Err>>
-    };
-
-    let output = ReturnType::Type( arrow, Box::new( ret_ty ));
-
-    let decl = Box::new( FnDecl {
-        fn_token,
-        generics,
-        paren_token,
-        inputs,
-        variadic: None,
-        output,
-    });
-
-    let visibility = vis.clone();
-
-    let item_fn = ItemFn {
-        attrs,
-        vis,
-        constness,
-        unsafety,
-        asyncness,
-        abi,
-        ident,
-        decl,
-        block,
-    };
-
-    let expanded = quote! {
-        #visibility mod #fn_mod_ {
-            use super::*;
-            use enumx::prelude::*;
-            #[derive( enumx_derive::Exchange, Debug )]
-            pub enum Err {
-                #(#variants),*
-            }
+                match given( try_expr ) {
+                    Given::Raw => try_.expr = self.attr.as_ref().map( |attr|
+                        match attr {
+                            CexAttr::Log(    Some( log )) => parse_quote!{ #try_expr.map_err_log(#log).map_error() },
+                            CexAttr::ToLog(  Some( log )) => parse_quote!{ #try_expr.map_err_to_log(#log).map_error() },
+                            CexAttr::Log(   None ) => parse_quote!{ #try_expr.map_err_log(frame!()).map_error() },
+                            CexAttr::ToLog( None ) => parse_quote!{ #try_expr.map_err_to_log(frame!()).map_error() },
+                            CexAttr::MapErr( expr ) => parse_quote!{ #try_expr.map_err(#expr).map_error() },
+                        }
+                    ).unwrap_or(
+                        parse_quote!{ #try_expr.map_error() }
+                    ),
+                    Given::Log => {
+                        try_.expr = parse_quote!{ #try_expr.map_error() };
+                    }
+                    Given::MapError => (),
+                }
+            },
+            Expr::TryBlock(_) | Expr::Closure(_) => {
+                let tag = self.tag;
+                self.tag = false;
+                syn::visit_mut::visit_expr_mut( self, expr );
+                self.tag = tag;
+            },
+            _ => syn::visit_mut::visit_expr_mut( self, expr ),
         }
+    }
+}
 
-        #item_fn
-    };
+fn grouped_expr( tt: Option<TokenTree> ) -> Option<Expr> {
+    tt.map( |tt| if let TokenTree::Group( group ) = tt {
+        syn::parse::<Expr>( group.stream() )
+            .expect( "an expression inside log/to_log/map_err" )
+    } else {
+        panic!("expect log(expr)/to_log(expr)/map_err(expr).");
+    })
+}
 
-    expanded.into()
+fn parse_cex_attr( ts: TokenStream ) -> Option<CexAttr> {
+    let mut iter = ts.into_iter();
+    match iter.next() {
+        Some( TokenTree::Ident( ident )) => match ident.to_string().as_str() {
+            "log"     => Some( CexAttr::Log(    grouped_expr( iter.next() ))),
+            "to_log"  => Some( CexAttr::ToLog(  grouped_expr( iter.next() ))),
+            "map_err" => Some( CexAttr::MapErr( grouped_expr( iter.next() )
+                .expect("an expression inside map_err(...)") )),
+            _ => panic!( "Only log/to_log/map_err are supported in #[cex(...)]"),
+        },
+        _ => None,
+    }
+}
+
+/// `#[cex]` attribute for functions, closures and try blocks, to append
+/// combinators to try expressions.
+///
+/// # Syntax
+///
+/// * A `#[cex]` will append `.map_error()`s to try expressions, unless they end
+/// with it already.
+/// 
+/// * Besides, a `#[cex(log)]` will append `.map_err_log(frame!())`s to try
+/// expressions.
+/// 
+/// * Besides, a `#[cex(log(expr))]` will append `.map_err_log(#expr)`s to try
+/// expressions.
+/// 
+/// * A `#[cex(to_log)]` is similar with `#[cex(log)]`, but provides
+/// `map_err_to_log` instead of `map_err_log`.
+/// 
+/// * A `#[cex(to_log(expr)]` is similar with `#[cex(log(expr))]`, but provides
+/// `map_err_to_log` instead of `map_err_log`.
+/// 
+/// * Besides, a `#[cex(map_err(expr))]` will append `.map_err(#expr)`s to try
+/// expressions.
+/// 
+/// * All the logging attributes will append nothing if the try expressions end with
+/// `.map_err_to_log()`/`.map_err_log()`/`.map_err()` already.
+/// 
+/// * All the `#[cex]` tags will append nothing for functions, closures and try
+/// expressions inside the `#[cex] fn` that are not tagged with `#[cex]` themselves.
+#[proc_macro_attribute]
+pub fn cex( args: TokenStream, input: TokenStream ) -> TokenStream {
+    let cex_arg = parse_cex_attr( args );
+
+    if let Ok( mut item_fn ) = syn::parse::<ItemFn>( input.clone() ) {
+        CexTag::new( true, cex_arg ).visit_block_mut( &mut *item_fn.block );
+        let expanded = quote!( #item_fn );
+        return TokenStream::from( expanded );
+    } else if let Ok( expr ) = syn::parse::<Expr>( input ) {
+        if let Expr::Closure( mut closure ) = expr {
+            CexTag::new( true, cex_arg ).visit_expr_mut( &mut *closure.body );
+            let expanded = quote!( #closure );
+            return TokenStream::from( expanded );
+        } else if let Expr::TryBlock( mut try_block ) = expr {
+            CexTag::new( true, cex_arg ).visit_block_mut( &mut try_block.block );
+            let expanded = quote!( #try_block );
+            return TokenStream::from( expanded );
+        }
+    }
+    panic!( "#[cex] for functions, closures and try blocks only" );
 }

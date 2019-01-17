@@ -1,9 +1,9 @@
 [package]
 name = "enumx_derive"
-version = "0.3.0-alpha"
+version = "0.3.0"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
-keywords = [ "enum", "anonymous", "union", "sum", "ad-hoc" ]
+keywords = [ "enum", "anonymous", "structural", "sum", "ad-hoc" ]
 readme = "README.md"
 repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/enumx_derive"

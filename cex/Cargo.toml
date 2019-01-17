@@ -1,19 +1,23 @@
 [package]
 name = "cex"
-version = "0.3.0-alpha"
+version = "0.3.0"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
-keywords = [ "exception", "error", "throw", "throws", "ad-hoc" ]
+keywords = [ "exception", "error", "throws", "log", "backtrace" ]
 readme = "README.md"
 repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/cex"
 categories = [ "rust-patterns" ]
 edition = "2018"
-description = "Checked exception in Rust."
+description = "Combinators of EnumX, for error-handling"
 
 [dependencies]
-enumx = "^0.3.0-alpha"
+enumx = "0.3"
+failure = { version = "0.1", optional = true }
 
 [dev-dependencies]
-enumx_derive = "^0.3.0-alpha"
-cex_derive = "^0.3.0-alpha"
+enumx_derive = "0.3"
+cex_derive = "0.3"
+
+[features]
+dyn_err = ["failure"]

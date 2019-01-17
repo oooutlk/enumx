@@ -17,12 +17,12 @@ use syn::{parse_quote, DeriveInput, Ident};
 
 macro_rules! syntax_error {
     () => {
-        panic!( "`enum`s deriving `Exchange` should be in the form of \"enum MyEnum { Foo(Type), Bar(AnotherType),... }\"" );
+        panic!( "`enum`s deriving `EnumX` should be in the form of \"enum MyEnum { Foo(Type), Bar(AnotherType),... }\"" );
     }
 }
 
-#[proc_macro_derive( Exchange )]
-pub fn derive_exchange( input: TokenStream ) -> TokenStream {
+#[proc_macro_derive( EnumX )]
+pub fn derive_enumx( input: TokenStream ) -> TokenStream {
     let input: DeriveInput = syn::parse( input ).unwrap();
 
     match input.data {
@@ -61,7 +61,7 @@ pub fn derive_exchange( input: TokenStream ) -> TokenStream {
             let enumx_ty: syn::Type = parse_quote!{ #enumx<#(#variant_ty),*> };
 
             let expanded = quote! {
-                impl #impl_generics enumx::Exchange for #name #ty_generics #where_clause {
+                impl #impl_generics enumx::EnumX for #name #ty_generics #where_clause {
                     type Proto = #enumx_ty;
 
                     fn from_proto( src: #enumx_ty ) -> Self {
@@ -79,7 +79,7 @@ pub fn derive_exchange( input: TokenStream ) -> TokenStream {
             };
             expanded.into()
         },
-        _ => panic!( "Only `enum`s can be `Exchange`." ),
+        _ => panic!( "Only `enum`s can be `EnumX`." ),
     }
 }
 

@@ -1,6 +1,10 @@
 # Purpose
 
-This is a proof of concept project aiming at implementing anonymous enum and "checked exception" like error handling in Rust via proc-macro.
+This is a proof of concept project aiming at
+
+- Structural enum inplemented enum exchange.
+
+- Applying enum exchange with the special interest in error-handling.
 
 Four crates categorized into the fowllowing sub projects:
 

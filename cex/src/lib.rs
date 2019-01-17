@@ -1,158 +1,172 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
-// Licensed under MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>
+// Licensed under MIT license<LICENSE-MIT or http://opensource.org/licenses/MIT>
 
-//! Checked exception simulation in Rust.
+#![cfg_attr( test,
+    feature( try_blocks, stmt_expr_attributes, proc_macro_hygiene ))]
 
-pub use enumx::Enum;
+//! Combinators for EnumX in general, or
+//! Combinators for Error eXchange in error-handling.
+//!
+//! # Example
+//!
+//! ```rust
+//! use enumx_derive::EnumX;
+//! use enumx::prelude::*;
+//!
+//! use cex_derive::{cex,Logger};
+//! use cex::*;
+//!
+//! #[derive( EnumX, Logger, Debug )]
+//! enum ReadU32Error {
+//!     IO(    Log<std::io::Error> ),
+//!     Parse( Log<std::num::ParseIntError> ),
+//! }
+//! 
+//! #[cex(to_log)]
+//! fn read_u32( filename: &'static str )
+//!     -> Result<u32, ReadU32Error>
+//! {
+//!     use std::io::Read;
+//! 
+//!     let mut f = std::fs::File::open( filename )?;
+//!     let mut s = String::new();
+//!     f.read_to_string( &mut s )?;
+//!     let number = s.trim().parse::<u32>()?;
+//!     Ok( number )
+//! }
+//! 
+//! #[derive( Debug, PartialEq, Eq )]
+//! struct MulOverflow( u32, u32 );
+//! 
+//! #[derive( EnumX, Logger, Debug )]
+//! enum AMulBEqCError {
+//!     IO(       Log<std::io::Error> ),
+//!     Parse(    Log<std::num::ParseIntError> ),
+//!     Overflow( Log<MulOverflow> ),
+//! }
+//! 
+//! #[cex(log)]
+//! fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c: &'static str )
+//!     -> Result<bool, AMulBEqCError>
+//! {
+//!     let a = read_u32( file_a )?;
+//! 
+//!     let b = match read_u32( file_b ) {
+//!         Ok(  value ) => value,
+//!         Err( err ) => {
+//!             if a == 0 {
+//!                 0 // 0 * b == 0, no matter what b is.
+//!             } else {
+//!                 return err.error();
+//!             }
+//!         },
+//!     };
+//!  
+//!     let c = match read_u32( file_c ) {
+//!         Ok(  value ) => value,
+//!         Err( err   ) => match err {
+//!             ReadU32Error::IO(    _ ) => 0, // default to 0 if file is missing.
+//!             ReadU32Error::Parse( e ) => return e.error(),
+//!         },
+//!     };
+//! 
+//!     Ok( a.checked_mul( b )
+//!         .ok_or( MulOverflow(a,b) )
+//!         .map( |result| result == c )
+//!         .map_err_to_log( frame!() )
+//!     ? )
+//! }
+//! ```
+
 pub use enumx::prelude::*;
 
-pub type Logs = Vec<Log>;
-
-/// Checked exception
-#[must_use]
-#[derive( Debug,PartialEq,Eq,PartialOrd,Ord )]
-pub struct Cex<Enum> {
-    pub error : Enum,
-    pub logs  : Logs,
-}
-
-impl<Enum> Cex<Enum> {
-    pub fn new<Error,Index,Kind>( err: Error, logs: Logs ) -> Self
-        where Error: IntoEnum<Enum,Index,Kind>
+/// Enum exchange to wrap an `Ok`.
+/// ```rust
+/// use cex::*;
+/// use enumx::Enum;
+///
+/// let ok: Result<Enum!(i32,bool),()> = 42.okey();
+/// assert_eq!( ok, Ok( Enum2::_0(42) ));
+/// ```
+pub trait Okey {
+    fn okey<E,Dest,Index>( self ) -> Result<Dest,E>
+        where Self: Sized + IntoEnumx<Dest,Index>
     {
-        Cex{ error: err.into_enum(), logs }
-    }
-
-    pub fn rethrow<T,Dest,Indices,Kind>( self ) -> Result<T,Cex<Dest>>
-        where Enum: ExchangeInto<Dest,Indices,Kind>
-    {
-        Err( Cex{ error: self.error.exchange_into(), logs: self.logs })
-    }
-
-    pub fn rethrow_log<T,Dest,Indices,Kind>( mut self, log: Log ) -> Result<T,Cex<Dest>>
-        where Enum: ExchangeInto<Dest,Indices,Kind>
-    {
-        self.logs.push( log );
-        Err( Cex{ error: self.error.exchange_into(), logs: self.logs })
+        Ok( self.into_enumx() )
     }
 }
 
-/// Converts a plain error to a checked exception
-pub trait Throw<Enum> {
-    #[inline( always )]
-    fn throw<T,Index,Kind>( self ) -> Result<T,Cex<Enum>>
-        where Self : Sized + IntoEnum<Enum,Index,Kind>
-    {
-        Err( Cex{ error: self.into_enum(), logs: Vec::new() })
-    }
+impl<Enum> Okey for Enum {}
 
-    #[inline( always )]
-    fn throw_log<T,Index,Kind>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where Self : Sized + IntoEnum<Enum,Index,Kind>
+/// Enum exchange to wrap an `Err`.
+/// ```rust
+/// use cex::*;
+/// use enumx::Enum;
+///
+/// let error: Result<(),Enum!(i32,bool)> = 42.error();
+/// assert_eq!( error, Err( Enum2::_0(42) ));
+/// ```
+pub trait Error {
+    fn error<T,Dest,Index>( self ) -> Result<T,Dest>
+        where Self: Sized + IntoEnumx<Dest,Index>
     {
-        Err( Cex{ error: self.into_enum(), logs: vec![ log ]})
+        Err( self.into_enumx() )
     }
 }
 
-impl<E,Enum> Throw<Enum> for E {}
+impl<Enum> Error for Enum {}
 
-/// Converts a result containing a plain error to a result containing a checked exception.
-pub trait MayThrow<T,E>
-    where Self : Into<Result<T,E>>
+/// Enum exchange for `Ok` combinator.
+/// ```rust
+/// use cex::*;
+/// use enumx::Enum;
+///
+/// let ok: Result<i32,()> = Ok( 42 );
+/// let ok: Result<Enum!(i32,bool),()> = ok.map_okey();
+/// assert_eq!( ok, Ok( Enum2::_0(42) ));
+/// ```
+pub trait MapOkey<Src,E>
+    where Self : Into<Result<Src,E>>
 {
-    #[inline( always )]
-    fn may_throw<Enum,Index,Kind>( self ) -> Result<T,Cex<Enum>>
-        where E : IntoEnum<Enum,Index,Kind>
+    fn map_okey<Dest,Indices>( self ) -> Result<Dest,E>
+        where Src : Sized + IntoEnumx<Dest,Indices>
     {
-        self.into().map_err( |err| Cex{ error: err.into_enum(), logs: Vec::new() })
-    }
-
-    #[inline( always )]
-    fn may_throw_log<Enum,Index,Kind>( self, log: Log ) -> Result<T,Cex<Enum>>
-        where E : IntoEnum<Enum,Index,Kind>
-    {
-        self.into().map_err( |err| Cex{ error: err.into_enum(), logs: vec![ log ]})
+        self.into().map( |src| src.into_enumx() )
     }
 }
 
-impl<Res,T,E> MayThrow<T,E> for Res where Res: Into<Result<T,E>> {}
+impl<Res,T,Src> MapOkey<T,Src> for Res where Res: Into<Result<T,Src>> {}
 
-/// Converts a result containing a checked exception to a result containing another one.
-pub trait MayRethrow<T,Src>
-    where Self : Into<Result<T,Cex<Src>>>
+/// Enum exchange for `Err` combinator.
+/// ```rust
+/// use cex::*;
+/// use enumx::Enum;
+///
+/// let error: Result<(),i32> = Err( 42 );
+/// let error: Result<(),Enum!(i32,bool)> = error.map_error();
+/// assert_eq!( error, Err( Enum2::_0(42) ));
+/// ```
+pub trait MapError<T,Src>
+    where Self : Into<Result<T,Src>>
 {
-    #[inline( always )]
-    fn may_rethrow<Dest,Indices,Kind>( self ) -> Result<T,Cex<Dest>>
-        where Src : ExchangeInto<Dest,Indices,Kind>
+    fn map_error<Dest,Indices>( self ) -> Result<T,Dest>
+        where Src : Sized + IntoEnumx<Dest,Indices>
     {
-        self.into().map_err( |cex| Cex{ error: cex.error.exchange_into(), logs: cex.logs })
-    }
-
-    #[inline( always )]
-    fn may_rethrow_log<Dest,Indices,Kind>( self, log: Log ) -> Result<T,Cex<Dest>>
-        where Src : ExchangeInto<Dest,Indices,Kind>
-    {
-        self.into().map_err( |mut cex| {
-            cex.logs.push( log );
-            Cex{ error: cex.error.exchange_into(), logs: cex.logs }
-        })
+        self.into().map_err( |src| src.into_enumx() )
     }
 }
 
-impl<Res,T,Src> MayRethrow<T,Src> for Res where Res: Into<Result<T,Cex<Src>>> {}
+impl<Res,T,Src> MapError<T,Src> for Res where Res: Into<Result<T,Src>> {}
 
-/// A struct for tracing the propagation of the error.
-#[derive( Debug,PartialEq,Eq,PartialOrd,Ord )]
-pub struct Log {
-    pub module : &'static str,
-    pub file   : &'static str,
-    pub line   : u32,
-    pub column : u32,
-    pub info   : Option<String>,
-}
+pub mod log;
 
-impl Log {
-    pub fn new( module: &'static str, file: &'static str, line: u32, column: u32, info: Option<String> ) -> Self {
-        Log{ module, file, line, column, info }
-    }
-}
+pub use self::log::*;
 
-#[macro_export]
-macro_rules! log {
-    ( $($arg:tt)+ ) => {
-        Log::new( module_path!(), file!(), line!(), column!(), Some( format!( $($arg)+ )))
-    };
-    () => {
-        Log::new( module_path!(), file!(), line!(), column!(), None )
-    };
-}
+#[cfg( feature = "dyn_err" )]
+pub mod dyn_err;
 
-#[macro_export]
-macro_rules! throw {
-    ( $expr:expr ) => { return $expr.throw(); }
-}
-
-#[macro_export]
-macro_rules! throw_log {
-    ( $expr:expr, $($arg:tt)+ ) => { return $expr.throw_log( log!( $($arg)+ )); };
-    ( $expr:expr ) => { return $expr.throw_log( log!() ); };
-}
-
-#[macro_export]
-macro_rules! rethrow {
-    ( $expr:expr ) => { return $expr.rethrow(); }
-}
-
-#[macro_export]
-macro_rules! rethrow_log {
-    ( $expr:expr, $($arg:tt)+ ) => { return $expr.rethrow_log( log!( $($arg)+ )); };
-    ( $expr:expr ) => { return $expr.rethrow_log( log!() ); };
-}
-
-#[macro_export]
-macro_rules! Throws {
-    ( $($tt:tt)+ ) => { cex::Cex<Enum!($($tt)+)> }
-}
+#[cfg( feature = "dyn_err" )]
+pub use self::dyn_err::*;
 
 #[cfg( test )]
 mod test;

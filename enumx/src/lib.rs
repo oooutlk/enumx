@@ -2,6 +2,55 @@
 // Licensed under MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>
 
 //! Structural enums implemented in enum exchange.
+//!
+//! ```rust
+//!
+//! use enumx_derive::EnumX;
+//! use enumx::prelude::*;
+//!
+//! #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
+//! enum One<T> { The(T) }
+//!
+//! #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
+//! enum Two<A,B> { Former(A), Latter(B) }
+//!
+//! #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
+//! enum Three<A,B,C> { First(A), Second(B), Third(C), }
+//!
+//! let one = One::<i32>::enumx_from( 2018 );
+//!
+//! let one = One::<i32>::enumx_from( one );
+//! assert_eq!( one, One::The( 2018 ));
+//! 
+//! let two = Two::<String,i32>::enumx_from( one );
+//! assert_eq!( two, Two::Latter( 2018 ));
+//! 
+//! let two = Two::<i32,String>::enumx_from( two );
+//! assert_eq!( two, Two::Former( 2018 ));
+//! 
+//! let three = Three::<bool,String,i32>::enumx_from( two );
+//! assert_eq!( three, Three::Third( 2018 ));
+//! 
+//! let three = Three::<i32,String,bool>::enumx_from( three );
+//! assert_eq!( three, Three::First( 2018 ));
+//!
+//! let one: One<String> = "rust".to_string().into_enumx();
+//! 
+//! let one: One<String> = one.into_enumx();
+//! assert_eq!( one, One::The( "rust".to_string() ));
+//! 
+//! let two: Two<i32,String> = one.into_enumx();
+//! assert_eq!( two, Two::Latter( "rust".to_string() ));
+//! 
+//! let two: Two<String,i32> = two.into_enumx();
+//! assert_eq!( two, Two::Former( "rust".to_string() ));
+//! 
+//! let three: Three<bool,i32,String> = two.into_enumx();
+//! assert_eq!( three, Three::Third( "rust".to_string() ));
+//! 
+//! let three: Three<String,i32,bool> = three.into_enumx();
+//! assert_eq!( three, Three::First( "rust".to_string() ));
+//! ``` 
 
 // Kind
 pub struct AA; // Anonymous to Anonymous
@@ -11,32 +60,35 @@ pub struct NN; // Named to Named
 pub struct VA; // Variant to Anonymous
 pub struct VN; // Variant to Named
 
+pub struct FV; // from variant
+pub struct XF; // exchange from
+
 /// Constructs an enum from one of its variant type.
-pub trait FromVariant<Variant,Index,Kind> {
+pub trait FromVariant<Variant,Index> {
     fn from_variant( variant: Variant ) -> Self;
 }
 
 /// Converts an exchangeable enum into another one.
-pub trait IntoEnum<Enum,Index,Kind> {
+pub trait IntoEnum<Enum,Index> {
     fn into_enum( self ) -> Enum;
 }
 
-impl<Enum,Variant,Index,Kind> IntoEnum<Enum,Index,Kind> for Variant
-    where Enum: FromVariant<Variant,Index,Kind>
+impl<Enum,Variant,Index> IntoEnum<Enum,Index> for Variant
+    where Enum: FromVariant<Variant,Index>
 {
     fn into_enum( self ) -> Enum {
-        FromVariant::<Variant,Index,Kind>::from_variant( self )
+        FromVariant::<Variant,Index>::from_variant( self )
     }
 }
 
 /// Constructs an exchangeable enum from another one.
-pub trait ExchangeFrom<Src,Indices,Kind> {
+pub trait ExchangeFrom<Src,Indices> {
     fn exchange_from( src: Src ) -> Self;
 }
 
-impl<Src,Dest,Proto,Indices> ExchangeFrom<Src,Indices,NA> for Dest
-    where Src  : Exchange<Proto=Proto>
-        , Dest : ExchangeFrom<Proto,Indices,AA>
+impl<Src,Dest,Proto,Indices> ExchangeFrom<Src,(Indices,NA)> for Dest
+    where Src  : EnumX<Proto=Proto>
+        , Dest : ExchangeFrom<Proto,(Indices,AA)>
 {
     fn exchange_from( src: Src ) -> Self {
         Dest::exchange_from( src.into_proto() )
@@ -44,21 +96,21 @@ impl<Src,Dest,Proto,Indices> ExchangeFrom<Src,Indices,NA> for Dest
 }
 
 /// Converts an exchangeable enum into another one.
-pub trait ExchangeInto<Dest,Indices,Kind> {
+pub trait ExchangeInto<Dest,Indices> {
     fn exchange_into( self ) -> Dest;
 }
 
-impl<Src,Dest,Indices> ExchangeInto<Dest,Indices,AA> for Src
-    where Dest: ExchangeFrom<Src,Indices,AA>
+impl<Src,Dest,Indices> ExchangeInto<Dest,(Indices,AA)> for Src
+    where Dest: ExchangeFrom<Src,(Indices,AA)>
 {
     fn exchange_into( self ) -> Dest {
-        ExchangeFrom::<Src,Indices,AA>::exchange_from( self )
+        ExchangeFrom::<Src,(Indices,AA)>::exchange_from( self )
     }
 }
 
-impl<Src,Dest,Proto,Indices> ExchangeInto<Dest,Indices,AN> for Src
-    where Dest : Exchange<Proto=Proto>
-        , Src  : ExchangeInto<Proto,Indices,AA>
+impl<Src,Dest,Proto,Indices> ExchangeInto<Dest,(Indices,AN)> for Src
+    where Dest : EnumX<Proto=Proto>
+        , Src  : ExchangeInto<Proto,(Indices,AA)>
 {
     fn exchange_into( self ) -> Dest {
         Dest::from_proto( self.exchange_into() )
@@ -80,17 +132,17 @@ pub enum Enum0 {}
 #[derive( Debug, PartialEq, Eq, PartialOrd, Ord )]
 pub enum Enum1<T0> { _0(T0) }
 
-impl<T0> FromVariant<T0,V0,VA> for Enum1<T0> {
+impl<T0> FromVariant<T0,(V0,VA)> for Enum1<T0> {
     fn from_variant( variant: T0 ) -> Self {
         Enum1::_0( variant )
     }
 }
 
-impl<T0> ExchangeFrom<Enum0,Nil,AA> for Enum1<T0> {
+impl<T0> ExchangeFrom<Enum0,(Nil,AA)> for Enum1<T0> {
     fn exchange_from( src: Enum0 ) -> Self { match src {} }
 }
 
-impl<T0> ExchangeFrom<Enum1<T0>,V0,AA> for Enum1<T0> {
+impl<T0> ExchangeFrom<Enum1<T0>,(V0,AA)> for Enum1<T0> {
     fn exchange_from( src: Enum1<T0> ) -> Self {
         match src {
             Enum1::_0(v) => Enum1::_0(v)
@@ -101,54 +153,84 @@ impl<T0> ExchangeFrom<Enum1<T0>,V0,AA> for Enum1<T0> {
 include!( concat!( env!( "OUT_DIR" ), "/predefined.rs" ));
 
 /// Indicates the prototype for a user-defined exchangeable enum.
-pub trait Exchange {
+pub trait EnumX {
     type Proto;
     fn from_proto( src: Self::Proto ) -> Self;
     fn into_proto( self ) -> Self::Proto;
 }
 
-impl<Variant,Enum,Proto,Index> FromVariant<Variant,Index,VN> for Enum
-    where Self  : Exchange<Proto=Proto>
-        , Proto : FromVariant<Variant,Index,VA>
+impl<Variant,Enum,Proto,Index> FromVariant<Variant,(Index,VN)> for Enum
+    where Self  : EnumX<Proto=Proto>
+        , Proto : FromVariant<Variant,(Index,VA)>
 {
     fn from_variant( variant: Variant ) -> Self {
         Enum::from_proto( Proto::from_variant( variant ))
     }
 }
 
-impl<Src,Dest,Proto,Indices> ExchangeFrom<Src,Indices,AN> for Dest
-    where Self  : Exchange<Proto=Proto>
-        , Proto : ExchangeFrom<Src,Indices,AA>
+impl<Src,Dest,Proto,Indices> ExchangeFrom<Src,(Indices,AN)> for Dest
+    where Self  : EnumX<Proto=Proto>
+        , Proto : ExchangeFrom<Src,(Indices,AA)>
 {
     fn exchange_from( src: Src ) -> Self {
         Dest::from_proto( Proto::exchange_from( src ))
     }
 }
 
-impl<Src,Dest,Proto,Indices> ExchangeInto<Dest,Indices,NA> for Src
-    where Self  : Exchange<Proto=Proto>
-        , Proto : ExchangeInto<Dest,Indices,AA>
+impl<Src,Dest,Proto,Indices> ExchangeInto<Dest,(Indices,NA)> for Src
+    where Self  : EnumX<Proto=Proto>
+        , Proto : ExchangeInto<Dest,(Indices,AA)>
 {
     fn exchange_into( self ) -> Dest {
         self.into_proto().exchange_into()
     }
 }
 
-impl<Src,Dest,Proto,Indices> ExchangeFrom<Src,Indices,NN> for Dest
-    where Self  : Exchange<Proto=Proto>
-        , Proto : ExchangeFrom<Src,Indices,NA>
+impl<Src,Dest,Proto,Indices> ExchangeFrom<Src,(Indices,NN)> for Dest
+    where Self  : EnumX<Proto=Proto>
+        , Proto : ExchangeFrom<Src,(Indices,NA)>
 {
     fn exchange_from( src: Src ) -> Self {
         Dest::from_proto( Proto::exchange_from( src ))
     }
 }
 
-impl<Src,Dest,Proto,Indices> ExchangeInto<Dest,Indices,NN> for Src
-    where Self  : Exchange<Proto=Proto>
-        , Proto : ExchangeInto<Dest,Indices,AN>
+impl<Src,Dest,Proto,Indices> ExchangeInto<Dest,(Indices,NN)> for Src
+    where Self  : EnumX<Proto=Proto>
+        , Proto : ExchangeInto<Dest,(Indices,AN)>
 {
     fn exchange_into( self ) -> Dest {
         self.into_proto().exchange_into()
+    }
+}
+
+/// Constructs an exchangeable enum from one of its variant type, or from another enum.
+pub trait EnumxFrom<Src,Index> {
+    fn enumx_from( src: Src ) -> Self;
+}
+
+impl<Src,Dest,Index> EnumxFrom<Src,(Index,FV)> for Dest
+    where Dest : FromVariant<Src,Index>
+{
+    fn enumx_from( src: Src ) -> Self { Dest::from_variant( src )}
+}
+
+impl<Src,Dest,Indices> EnumxFrom<Src,(Indices,XF)> for Dest
+    where Dest : ExchangeFrom<Src,Indices>
+{
+    fn enumx_from( src: Src ) -> Self { Dest::exchange_from( src )}
+}
+
+/// Converts a variant, or an exchangeable enum into another exchangeable enum.
+pub trait IntoEnumx<Dest,Index> {
+    fn into_enumx( self ) -> Dest;
+}
+
+impl<Src,Dest,Index> IntoEnumx<Dest,Index> for Src
+    where Dest : EnumxFrom<Src,Index>
+{
+    fn into_enumx( self ) -> Dest {
+        EnumxFrom::<Src,Index>::enumx_from( self )
     }
 }
 
@@ -225,18 +307,18 @@ mod tests {
     }
 
     mod test_named {
-        mod enumx { pub use crate::Exchange; }
+        mod enumx { pub use crate::EnumX; }
 
         use super::*;
-        use enumx_derive::Exchange;
+        use enumx_derive::EnumX;
 
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum One<T> { The(T) }
 
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum Two<A,B> { Former(A), Latter(B) }
    
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum Three<A,B,C> { First(A), Second(B), Third(C), }
 
         #[test]
@@ -329,6 +411,46 @@ mod tests {
             let enum3 = Enum3::<String,i32,bool>::from_variant( 2018 );
             let three = Three::<bool,String,i32>::exchange_from( enum3 );
             assert_eq!( three, Three::Third( 2018 ));
+        }
+
+        #[test]
+        fn test_enumx_from() {
+            let one = One::<i32>::enumx_from( 2018 );
+
+            let one = One::<i32>::enumx_from( one );
+            assert_eq!( one, One::The( 2018 ));
+            
+            let two = Two::<String,i32>::enumx_from( one );
+            assert_eq!( two, Two::Latter( 2018 ));
+            
+            let two = Two::<i32,String>::enumx_from( two );
+            assert_eq!( two, Two::Former( 2018 ));
+            
+            let three = Three::<bool,String,i32>::enumx_from( two );
+            assert_eq!( three, Three::Third( 2018 ));
+            
+            let three = Three::<i32,String,bool>::enumx_from( three );
+            assert_eq!( three, Three::First( 2018 ));
+        }
+
+        #[test]
+        fn test_enumx_into() {
+            let one: One<String> = "rust".to_string().into_enumx();
+    
+            let one: One<String> = one.into_enumx();
+            assert_eq!( one, One::The( "rust".to_string() ));
+    
+            let two: Two<i32,String> = one.into_enumx();
+            assert_eq!( two, Two::Latter( "rust".to_string() ));
+    
+            let two: Two<String,i32> = two.into_enumx();
+            assert_eq!( two, Two::Former( "rust".to_string() ));
+    
+            let three: Three<bool,i32,String> = two.into_enumx();
+            assert_eq!( three, Three::Third( "rust".to_string() ));
+    
+            let three: Three<String,i32,bool> = three.into_enumx();
+            assert_eq!( three, Three::First( "rust".to_string() ));
         }
     }
 }

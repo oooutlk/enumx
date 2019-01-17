@@ -1,20 +1,24 @@
 use super::*;
 
+use cex_derive::cex;
+
 #[derive( EnumX, Debug )]
 enum ReadU32Error {
-    IO( std::io::Error ),
     Parse( std::num::ParseIntError ),
+    Other( DynErr ),
 }
 
+#[cex]
 fn read_u32( filename: &'static str )
     -> Result<u32,ReadU32Error>
 {
     use std::io::Read;
 
-    let mut f = std::fs::File::open( filename ).map_error()?;
+    let mut f = std::fs::File::open( filename ).map_dyn_err()?;
+
     let mut s = String::new();
-    f.read_to_string( &mut s ).map_error()?;
-    let number = s.trim().parse::<u32>().map_error()?;
+    f.read_to_string( &mut s ).map_dyn_err()?;
+    let number = s.trim().parse::<u32>()?;
     Ok( number )
 }
 
@@ -23,15 +27,16 @@ struct MulOverflow( u32, u32 );
 
 #[derive( EnumX, Debug )]
 enum AMulBEqCError {
-    IO( std::io::Error ),
     Parse( std::num::ParseIntError ),
     Overflow( MulOverflow ),
+    Other( DynErr ),
 }
 
+#[cex]
 fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c: &'static str )
     -> Result<bool, AMulBEqCError>
 {
-    let a = read_u32( file_a ).map_error()?;
+    let a = read_u32( file_a )?;
 
     let b = match read_u32( file_b ) {
         Ok(  value ) => value,
@@ -47,7 +52,7 @@ fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c: &'static st
     let c = match read_u32( file_c ) {
         Ok(  value ) => value,
         Err( err   ) => match err {
-            ReadU32Error::IO(    _ ) => 0, // default to 0 if file is missing.
+            ReadU32Error::Other( _ ) => 0, // default to 0 if file is missing.
             ReadU32Error::Parse( e ) => return e.error(),
         },
     };
@@ -61,7 +66,7 @@ fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c: &'static st
 #[test]
 fn test_read_u32() {
     assert!( read_u32("src/test/no_file").map_err( |err|
-        if let ReadU32Error::IO(_) = err { true } else { false }
+        if let ReadU32Error::Other(_) = err { true } else { false }
     ).unwrap_err() );
 
     assert!( read_u32("src/test/not_num").map_err( |err| {
@@ -76,7 +81,7 @@ fn test_a_mul_b_eq_c() {
     assert!(
         a_mul_b_eq_c( "src/test/no_file", "src/test/7", "src/test/21"
         ).map_err( |err|
-            if let AMulBEqCError::IO(_) = err { true } else { false }
+            if let AMulBEqCError::Other(_) = err { true } else { false }
         ).unwrap_err() );
 
     assert!(
@@ -88,7 +93,7 @@ fn test_a_mul_b_eq_c() {
     assert!(
         a_mul_b_eq_c( "src/test/3", "src/test/no_file", "src/test/21"
         ).map_err( |err|
-            if let AMulBEqCError::IO(_) = err { true } else { false }
+            if let AMulBEqCError::Other(_) = err { true } else { false }
         ).unwrap_err() );
 
     assert!(

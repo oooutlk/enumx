@@ -28,7 +28,7 @@ pub enum Enum{X}<{generics}> {{ {variants} }}"#,
 
         for index_fv in 0..=x {
             impl_from_variant.push_str( &format!( r#"
-impl<{generics}> FromVariant<T{i},V{i},VA> for Enum{X}<{generics}> {{
+impl<{generics}> FromVariant<T{i},(V{i},VA)> for Enum{X}<{generics}> {{
     fn from_variant( variant: T{i} ) -> Self {{
         Enum{X}::_{i}( variant )
     }}
@@ -39,19 +39,19 @@ impl<{generics}> FromVariant<T{i},V{i},VA> for Enum{X}<{generics}> {{
         }
 
         let impl_exchange_from_enum0 = format!( r#"
-impl<{generics}> ExchangeFrom<Enum0,Nil,AA> for Enum{X}<{generics}> {{
+impl<{generics}> ExchangeFrom<Enum0,(Nil,AA)> for Enum{X}<{generics}> {{
     fn exchange_from( src: Enum0 ) -> Self {{ match src {{}} }}
 }}"#,
              generics = generics, X = x+1
         );
 
         let impl_exchange_from_enum1 = format!( r#"
-impl<Indices,S0,{generics}> ExchangeFrom<Enum1<S0>,Indices,AA> for Enum{X}<{generics}>
-    where Self : FromVariant<S0,Indices,VA>
+impl<Indices,S0,{generics}> ExchangeFrom<Enum1<S0>,(Indices,AA)> for Enum{X}<{generics}>
+    where Self : FromVariant<S0,(Indices,VA)>
 {{
     fn exchange_from( src: Enum1<S0> ) -> Self {{
         match src {{
-            Enum1::_0(v) => <Self as FromVariant<S0,Indices,VA>>::from_variant(v),
+            Enum1::_0(v) => <Self as FromVariant<S0,(Indices,VA)>>::from_variant(v),
         }}
     }}
 }}"#,
@@ -66,19 +66,19 @@ impl<Indices,S0,{generics}> ExchangeFrom<Enum1<S0>,Indices,AA> for Enum{X}<{gene
 
             for v in 1..src_idx {
                 rest_arms.push_str( &format!( r#"
-            Enum{src_idx}::_{v}(v) => <Self as ExchangeFrom<Enum{descent_idx}<{src_generics}>,R,AA>>::exchange_from( Enum{descent_idx}::_{u}(v) ),"#,
+            Enum{src_idx}::_{v}(v) => <Self as ExchangeFrom<Enum{descent_idx}<{src_generics}>,(R,AA)>>::exchange_from( Enum{descent_idx}::_{u}(v) ),"#,
                     src_generics = src_generics, v = v, u = v-1, src_idx = src_idx, descent_idx = src_idx-1,
                 ));
             }
 
             impl_exchange_from.push_str( &format!( r#"
-impl<L,R,S0,{src_generics},{generics}> ExchangeFrom<Enum{src_idx}<S0,{src_generics}>,LR<L,R>,AA> for Enum{dest_idx}<{generics}>
-    where Self : FromVariant<S0,L,VA>
-               + ExchangeFrom<Enum{descent_idx}<{src_generics}>,R,AA>
+impl<L,R,S0,{src_generics},{generics}> ExchangeFrom<Enum{src_idx}<S0,{src_generics}>,(LR<L,R>,AA)> for Enum{dest_idx}<{generics}>
+    where Self : FromVariant<S0,(L,VA)>
+               + ExchangeFrom<Enum{descent_idx}<{src_generics}>,(R,AA)>
 {{
     fn exchange_from( src: Enum{src_idx}<S0,{src_generics}> ) -> Self {{
         match src {{
-            Enum{src_idx}::_0(v) => <Self as FromVariant<S0,L,VA>>::from_variant(v),{rest_arms}
+            Enum{src_idx}::_0(v) => <Self as FromVariant<S0,(L,VA)>>::from_variant(v),{rest_arms}
         }}
     }}
 }}
@@ -111,11 +111,13 @@ macro_rules! Enum {{
 
     let prelude = format!( r#"
 pub mod prelude {{
-    pub use super::Exchange;
+    pub use super::EnumX;
     pub use super::ExchangeFrom;
     pub use super::ExchangeInto;
     pub use super::FromVariant;
     pub use super::IntoEnum;
+    pub use super::EnumxFrom;
+    pub use super::IntoEnumx;
 {}}}
 "#,
         (0..=max_index).fold( String::new(), |acc,idx| format!( "{}    pub use super::Enum{};\n", acc, idx )));
