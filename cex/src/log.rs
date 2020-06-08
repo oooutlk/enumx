@@ -1,38 +1,10 @@
-//! Extrusive logging and backtrace support
-//!
-//! # Example
-//!
-//! Change
-//! 
-//! ```rust
-//! use enumx_derive::EnumX;
-//! use enumx::prelude::*;
-//!
-//! #[derive( EnumX )]
-//! enum Error {
-//!     IO(    std::io::Error ),
-//!     Parse( std::num::ParseIntError ),
-//! }
-//! ```
-//! 
-//! to
-//! 
-//! ```rust,no_run
-//! use enumx_derive::EnumX;
-//! use enumx::prelude::*;
-//!
-//! use cex_derive::Logger;
-//! use cex::*;
-//!
-//! #[derive( EnumX, Logger )]
-//! enum Error {
-//!     IO(    Log<std::io::Error> ),
-//!     Parse( Log<std::num::ParseIntError> ),
-//! }
-//! ```
+//! Backtrace support
 
-use std::env;
-use std::marker::PhantomData;
+use std::{
+    env,
+    fmt::Debug,
+    marker::PhantomData,
+};
 
 /// Log agent.
 pub trait LogAgent {
@@ -67,11 +39,41 @@ impl LogAgent for String {
     fn append_log( &mut self, item: String ) { self.push_str( &format!( "\n{}", item )); }
 }
 
-/// A wrapper struct for logging inner value.
-#[derive( Debug,PartialEq,Eq )]
+/// A wrapper struct for logging error value.
+#[derive( PartialEq,Eq )]
 pub struct Log<Inner, Agent: LogAgent = Vec<Frame>> {
-    pub inner : Inner, // the wrapped value
+    pub error : Inner, // the error
     pub agent : Agent, // log agent
+}
+
+#[cfg( not( feature = "pretty_log" ))]
+impl<Inner,Agent> Debug for Log<Inner,Agent>
+    where Inner: Debug
+        , Agent: Debug + LogAgent
+{
+    fn fmt( &self, f: &mut std::fmt::Formatter ) -> std::fmt::Result {
+        f.debug_struct("Log")
+         .field( "error", &self.error )
+         .field( "agent", &self.agent )
+         .finish()
+    }
+}
+
+#[cfg( feature = "pretty_log" )]
+impl<Inner,Agent> Debug for Log<Inner,Agent>
+    where Inner: Debug
+        , Agent: Debug + LogAgent
+{
+    fn fmt( &self, f: &mut std::fmt::Formatter ) -> std::fmt::Result {
+        if f.alternate() {
+            f.debug_struct("Log")
+             .field( "error", &self.error )
+             .field( "agent", &self.agent )
+             .finish()
+        } else {
+            write!( f, "{:#?}", self )
+        }
+    }
 }
 
 /// A type alias for opt-out logging at compile time.
@@ -89,11 +91,11 @@ impl<Inner,Agent> ToLog<Agent> for Inner
     where Agent : LogAgent
 {
     fn new_log( self ) -> Log<Self,Agent> {
-        Log{ inner: self, agent: Agent::new() }
+        Log{ error: self, agent: Agent::new() }
     }
 
     fn to_log( self, item: Agent::Item ) -> Log<Inner,Agent> {
-        Log{ inner: self, agent: Agent::create_log( item )}
+        Log{ error: self, agent: Agent::create_log( item )}
     }
 }
 
@@ -113,89 +115,76 @@ impl<Agent,E> Logger<Agent> for Log<E,Agent>
     }
 }
 
-/// Environment variable controlled log level.
-///
-/// The variable is `CEX_LOG_LEVEL` which are parsed as `u32`, or in the
-/// human readable text: Debug, Info, Warn, Error, Fatal, Nolog
-///
-/// # Usage
-///
-/// If the user decide to use log level control, the type definition can be
-/// unchanged by using a type alias:
-/// `type Log<E> = cex::Log<E, Env<Vec<Frame>>>;`.
-///
-/// Then put log levels in client code, e.g. change
-/// `foo.map_err_to_log( frame!() )` to the following:
-/// `foo.map_err_to_log(( LogLevel::Debug, frame!() ))`.
-/// Note that `map_err_to_log()` accepts a tuple of two elements now.
+macro_rules! impl_logger_for_predefined_enumx {
+    ($($enumx:ident => $($_index:ident $gen:ident)*;)+) => {
+        use enumx::prelude::*;
+        $(
+            impl<Agent$(,$gen)*> Logger<Agent> for $enumx<$($gen),*>
+                where Agent : LogAgent
+                  $(, $gen  : Logger<Agent> )*
+            {
+                fn log( self, _item: Agent::Item ) -> Self {
+                    match self {
+                        $( $enumx::$_index( $_index ) => $enumx::$_index( Logger::<Agent>::log( $_index, _item )), )*
+                    }
+                }
+            }
+        )+
+    };
+}
+
+impl_logger_for_predefined_enumx! {
+    Enum0  => ;
+    Enum1  => _0 T0;
+    Enum2  => _0 T0 _1 T1;
+    Enum3  => _0 T0 _1 T1 _2 T2;
+    Enum4  => _0 T0 _1 T1 _2 T2 _3 T3;
+    Enum5  => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4;
+    Enum6  => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5;
+    Enum7  => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6;
+    Enum8  => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7;
+    Enum9  => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8;
+    Enum10 => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8 _9 T9;
+    Enum11 => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8 _9 T9 _10 T10;
+    Enum12 => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8 _9 T9 _10 T10 _11 T11;
+    Enum13 => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8 _9 T9 _10 T10 _11 T11 _12 T12;
+    Enum14 => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8 _9 T9 _10 T10 _11 T11 _12 T12 _13 T13;
+    Enum15 => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8 _9 T9 _10 T10 _11 T11 _12 T12 _13 T13 _14 T14;
+    Enum16 => _0 T0 _1 T1 _2 T2 _3 T3 _4 T4 _5 T5 _6 T6 _7 T7 _8 T8 _9 T9 _10 T10 _11 T11 _12 T12 _13 T13 _14 T14 _15 T15;
+}
+
+/// Environment variable `RUST_BACKTRACE` controlled log agent.
 #[derive( Debug, PartialEq, Eq )]
 pub struct Env<Agent: LogAgent>( Agent );
-
-/// Readable log level names
-#[repr(u32)]
-#[derive( Debug, PartialEq, Eq, PartialOrd, Ord )]
-pub enum LogLevel {
-    Nolog = 0,
-    Fatal = 1,
-    Error = 2,
-    Warn  = 3,
-    Info  = 4,
-    Debug = 5,
-}
 
 impl<Agent> LogAgent for Env<Agent>
     where Agent : LogAgent
 {
-    type Item = ( LogLevel, <Agent as LogAgent>::Item );
+    type Item = <Agent as LogAgent>::Item;
 
     fn new() -> Self {
         Env( Agent::new() )
     }
 
     fn append_log( &mut self, item: Self::Item ) {
-        if env_log_enabled( item.0 ) {
-            self.0.append_log( item.1 );
+        if env_log_enabled() {
+            self.0.append_log( item );
         }
     }
 
     fn create_log( item: Self::Item ) -> Self {
-        if env_log_enabled( item.0 ) {
-            Env( Agent::create_log( item.1 ))
+        if env_log_enabled() {
+            Env( Agent::create_log( item ))
         } else {
             Env( Agent::new() )
         }
     }
 }
 
-/// Read from the environment variable `CEX_LOG_LEVEL` to get a log level value in `u32`.
-/// Note that human readable names are also supported.
-pub fn log_level() -> u32 {
-    fn from_readable( name: &'static str ) -> u32 {
-        let value = match name {
-            "Debug" => LogLevel::Debug,
-            "Info"  => LogLevel::Info ,
-            "Warn"  => LogLevel::Warn ,
-            "Error" => LogLevel::Error,
-            "Fatal" => LogLevel::Fatal,
-            "Nolog" => LogLevel::Nolog,
-            _       => LogLevel::Nolog,
-        };
-        value as u32
-    }
-
-    let name = "CEX_LOG_LEVEL";
-
-    env::var( name )
-        .map( |var| var.parse::<u32>() )
-        .unwrap_or( Ok( from_readable( name )))
-        .expect( "either from CEX_LOG_LEVEL or default Nolog" )
-}
-
-fn env_log_enabled( level: LogLevel ) -> bool {
-    let level = level as u32;
-
-    level >  LogLevel::Nolog as u32 &&
-    level <= log_level()
+fn env_log_enabled() -> bool {
+    env::var( "RUST_BACKTRACE" )
+        .map( |value| value == "1" || value == "full" )
+        .unwrap_or( false )
 }
 
 /// Wraps the `Ok` variant with Log
@@ -278,7 +267,7 @@ impl<Agent,T,E> MapErrLog<Agent> for Result<T,E>
     }
 }
 
-/// A struct for store one frame for tracing.
+/// A struct for store one frame for backtrace.
 #[derive( Debug,Default,PartialEq,Eq,PartialOrd,Ord )]
 pub struct Frame {
     pub module : &'static str,
@@ -301,8 +290,8 @@ impl Frame {
 /// An example: `frame!( "An unexpected {:?} was detect.", local_var ))`
 #[macro_export]
 macro_rules! frame {
-    ( $($arg:tt)+ ) => {
-        Frame::new( module_path!(), file!(), line!(), column!(), Some( format!( $($arg)+ )))
+    ( $expr:expr ) => {
+        Frame::new( module_path!(), file!(), line!(), column!(), Some( String::from( $expr )))
     };
     () => {
         Frame::new( module_path!(), file!(), line!(), column!(), None )

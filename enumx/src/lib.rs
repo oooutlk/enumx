@@ -5,8 +5,7 @@
 //!
 //! ```rust
 //!
-//! use enumx_derive::EnumX;
-//! use enumx::prelude::*;
+//! use enumx::*;
 //!
 //! #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
 //! enum One<T> { The(T) }
@@ -21,36 +20,36 @@
 //!
 //! let one = One::<i32>::enumx_from( one );
 //! assert_eq!( one, One::The( 2018 ));
-//! 
+//!
 //! let two = Two::<String,i32>::enumx_from( one );
 //! assert_eq!( two, Two::Latter( 2018 ));
-//! 
+//!
 //! let two = Two::<i32,String>::enumx_from( two );
 //! assert_eq!( two, Two::Former( 2018 ));
-//! 
+//!
 //! let three = Three::<bool,String,i32>::enumx_from( two );
 //! assert_eq!( three, Three::Third( 2018 ));
-//! 
+//!
 //! let three = Three::<i32,String,bool>::enumx_from( three );
 //! assert_eq!( three, Three::First( 2018 ));
 //!
 //! let one: One<String> = "rust".to_string().into_enumx();
-//! 
+//!
 //! let one: One<String> = one.into_enumx();
 //! assert_eq!( one, One::The( "rust".to_string() ));
-//! 
+//!
 //! let two: Two<i32,String> = one.into_enumx();
 //! assert_eq!( two, Two::Latter( "rust".to_string() ));
-//! 
+//!
 //! let two: Two<String,i32> = two.into_enumx();
 //! assert_eq!( two, Two::Former( "rust".to_string() ));
-//! 
+//!
 //! let three: Three<bool,i32,String> = two.into_enumx();
 //! assert_eq!( three, Three::Third( "rust".to_string() ));
-//! 
+//!
 //! let three: Three<String,i32,bool> = three.into_enumx();
 //! assert_eq!( three, Three::First( "rust".to_string() ));
-//! ``` 
+//! ```
 
 // Kind
 pub struct AA; // Anonymous to Anonymous
@@ -234,6 +233,11 @@ impl<Src,Dest,Index> IntoEnumx<Dest,Index> for Src
     }
 }
 
+/// Wrapper for non-path types in type pattern matching using #[ty_pat] match
+pub type TyPat<T> = T;
+
+pub use enumx_derive::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,7 +321,7 @@ mod tests {
 
         #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum Two<A,B> { Former(A), Latter(B) }
-   
+
         #[derive( EnumX, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum Three<A,B,C> { First(A), Second(B), Third(C), }
 
@@ -351,16 +355,16 @@ mod tests {
 
             let one = One::<i32>::exchange_from( one );
             assert_eq!( one, One::The( 2018 ));
-            
+
             let two = Two::<String,i32>::exchange_from( one );
             assert_eq!( two, Two::Latter( 2018 ));
-            
+
             let two = Two::<i32,String>::exchange_from( two );
             assert_eq!( two, Two::Former( 2018 ));
-            
+
             let three = Three::<bool,String,i32>::exchange_from( two );
             assert_eq!( three, Three::Third( 2018 ));
-            
+
             let three = Three::<i32,String,bool>::exchange_from( three );
             assert_eq!( three, Three::First( 2018 ));
         }
@@ -419,16 +423,16 @@ mod tests {
 
             let one = One::<i32>::enumx_from( one );
             assert_eq!( one, One::The( 2018 ));
-            
+
             let two = Two::<String,i32>::enumx_from( one );
             assert_eq!( two, Two::Latter( 2018 ));
-            
+
             let two = Two::<i32,String>::enumx_from( two );
             assert_eq!( two, Two::Former( 2018 ));
-            
+
             let three = Three::<bool,String,i32>::enumx_from( two );
             assert_eq!( three, Three::Third( 2018 ));
-            
+
             let three = Three::<i32,String,bool>::enumx_from( three );
             assert_eq!( three, Three::First( 2018 ));
         }
@@ -436,19 +440,19 @@ mod tests {
         #[test]
         fn test_enumx_into() {
             let one: One<String> = "rust".to_string().into_enumx();
-    
+
             let one: One<String> = one.into_enumx();
             assert_eq!( one, One::The( "rust".to_string() ));
-    
+
             let two: Two<i32,String> = one.into_enumx();
             assert_eq!( two, Two::Latter( "rust".to_string() ));
-    
+
             let two: Two<String,i32> = two.into_enumx();
             assert_eq!( two, Two::Former( "rust".to_string() ));
-    
+
             let three: Three<bool,i32,String> = two.into_enumx();
             assert_eq!( three, Three::Third( "rust".to_string() ));
-    
+
             let three: Three<String,i32,bool> = three.into_enumx();
             assert_eq!( three, Three::First( "rust".to_string() ));
         }

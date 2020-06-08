@@ -1,102 +1,77 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
 // Licensed under MIT license<LICENSE-MIT or http://opensource.org/licenses/MIT>
 
-#![cfg_attr( test,
-    feature( try_blocks, stmt_expr_attributes, proc_macro_hygiene ))]
-
-//! Combinators for EnumX in general, or
-//! Combinators for Error eXchange in error-handling.
+//! Checked EXceptions for Rust.
 //!
-//! # Example
+//! # Features
+//!
+//! 1. Use `Result!( Type throws A,B,.. )`, `ret!()`, `throw!()` to simulate
+//! checked exceptions in Rust
+//!
+//! 2. `#[ty_pat] match` for "type as pattern matching" in match expressions.
+//!
+//! 3. Optional backtrace support.
+//!
+//! # Examples
 //!
 //! ```rust
-//! use enumx_derive::EnumX;
-//! use enumx::prelude::*;
-//!
-//! use cex_derive::{cex,Logger};
 //! use cex::*;
 //!
-//! #[derive( EnumX, Logger, Debug )]
-//! enum ReadU32Error {
-//!     IO(    Log<std::io::Error> ),
-//!     Parse( Log<std::num::ParseIntError> ),
+//! // accepts even numbers; rejects odd ones and report an error `String`
+//! #[cex]
+//! fn check_even( a: u32 ) -> Result!( u32 throws String ) {
+//!     if a % 2 == 1 {
+//!         throw!( format!( "odd numbers not allowed: a == {}", a ));
+//!     } else {
+//!         ret!( a );
+//!     }
 //! }
-//! 
-//! #[cex(to_log)]
-//! fn read_u32( filename: &'static str )
-//!     -> Result<u32, ReadU32Error>
-//! {
-//!     use std::io::Read;
-//! 
-//!     let mut f = std::fs::File::open( filename )?;
-//!     let mut s = String::new();
-//!     f.read_to_string( &mut s )?;
-//!     let number = s.trim().parse::<u32>()?;
-//!     Ok( number )
+//!
+//! // accepts non-zero numbers; rejects zeros and report an error of `&'static str`
+//! #[cex]
+//! fn check_nonzero( b: u32 ) -> Result!( u32 throws &'static str ) {
+//!     if b == 0 {
+//!         throw!( "zero not allowed: b == 0" );
+//!     } else {
+//!         ret!( b )
+//!     }
 //! }
-//! 
-//! #[derive( Debug, PartialEq, Eq )]
-//! struct MulOverflow( u32, u32 );
-//! 
-//! #[derive( EnumX, Logger, Debug )]
-//! enum AMulBEqCError {
-//!     IO(       Log<std::io::Error> ),
-//!     Parse(    Log<std::num::ParseIntError> ),
-//!     Overflow( Log<MulOverflow> ),
+//!
+//! struct Underflow;
+//!
+//! #[cex]
+//! fn sub( a: u32, b: u32 ) -> Result!( u32 throws String, &'static str, Underflow ) {
+//!     let a = check_even( a )?;
+//!     let b = check_nonzero( b )?;
+//!     ret!( a+b );
 //! }
-//! 
-//! #[cex(log)]
-//! fn a_mul_b_eq_c( file_a: &'static str, file_b: &'static str, file_c: &'static str )
-//!     -> Result<bool, AMulBEqCError>
-//! {
-//!     let a = read_u32( file_a )?;
-//! 
-//!     let b = match read_u32( file_b ) {
-//!         Ok(  value ) => value,
-//!         Err( err ) => {
-//!             if a == 0 {
-//!                 0 // 0 * b == 0, no matter what b is.
-//!             } else {
-//!                 return err.error();
-//!             }
-//!         },
-//!     };
-//!  
-//!     let c = match read_u32( file_c ) {
-//!         Ok(  value ) => value,
-//!         Err( err   ) => match err {
-//!             ReadU32Error::IO(    _ ) => 0, // default to 0 if file is missing.
-//!             ReadU32Error::Parse( e ) => return e.error(),
-//!         },
-//!     };
-//! 
-//!     Ok( a.checked_mul( b )
-//!         .ok_or( MulOverflow(a,b) )
-//!         .map( |result| result == c )
-//!         .map_err_to_log( frame!() )
-//!     ? )
+//!
+//! #[cex]
+//! fn distance( a: u32, b: u32 ) -> Result!( u32 throws String, &'static str ) {
+//!     ret!( sub(a,b).or_else( |err| {#[ty_pat] match err {
+//!         Underflow => ret!( b-a ),
+//!         String(s) => throw!( s ),
+//!         TyPat::<&'static str>(s) => throw!( s ),
+//!     }}))
+//! }
+//!
+//! #[cex]
+//! fn distance2( a: u32, b: u32 ) -> Result!( u32 throws String, &'static str ) {
+//!     ret!( sub(a,b).or_else( |err| #[ty_pat(gen_throws)] match err {
+//!         Underflow => ret!( b-a ),
+//!     }))
+//! }
+//!
+//! #[cex]
+//! fn distance3( a: u32, b: u32 ) -> Result!( u32 throws String, &'static str ) {
+//!     ret!( sub(a,b).or_else( |err| #[ty_pat(gen &'static str, String )] match err {
+//!         Underflow => ret!( b-a ),
+//!     }))
 //! }
 //! ```
 
 pub use enumx::prelude::*;
-
-/// Enum exchange to wrap an `Ok`.
-/// ```rust
-/// use cex::*;
-/// use enumx::Enum;
-///
-/// let ok: Result<Enum!(i32,bool),()> = 42.okey();
-/// assert_eq!( ok, Ok( Enum2::_0(42) ));
-/// ```
-pub trait Okey {
-    fn okey<E,Dest,Index>( self ) -> Result<Dest,E>
-        where Self: Sized + IntoEnumx<Dest,Index>
-    {
-        Ok( self.into_enumx() )
-    }
-}
-
-impl<Enum> Okey for Enum {}
+pub use enumx::{Enum, TyPat};
 
 /// Enum exchange to wrap an `Err`.
 /// ```rust
@@ -115,27 +90,6 @@ pub trait Error {
 }
 
 impl<Enum> Error for Enum {}
-
-/// Enum exchange for `Ok` combinator.
-/// ```rust
-/// use cex::*;
-/// use enumx::Enum;
-///
-/// let ok: Result<i32,()> = Ok( 42 );
-/// let ok: Result<Enum!(i32,bool),()> = ok.map_okey();
-/// assert_eq!( ok, Ok( Enum2::_0(42) ));
-/// ```
-pub trait MapOkey<Src,E>
-    where Self : Into<Result<Src,E>>
-{
-    fn map_okey<Dest,Indices>( self ) -> Result<Dest,E>
-        where Src : Sized + IntoEnumx<Dest,Indices>
-    {
-        self.into().map( |src| src.into_enumx() )
-    }
-}
-
-impl<Res,T,Src> MapOkey<T,Src> for Res where Res: Into<Result<T,Src>> {}
 
 /// Enum exchange for `Err` combinator.
 /// ```rust
@@ -158,15 +112,17 @@ pub trait MapError<T,Src>
 
 impl<Res,T,Src> MapError<T,Src> for Res where Res: Into<Result<T,Src>> {}
 
-pub mod log;
+pub mod result;
+pub use result::*;
 
+pub mod log;
 pub use self::log::*;
 
-#[cfg( feature = "dyn_err" )]
-pub mod dyn_err;
+#[cfg( not( any( feature="log", feature="env_log" )))]
+pub use cex_derive::cex;
 
-#[cfg( feature = "dyn_err" )]
-pub use self::dyn_err::*;
+#[cfg( all( feature="log", not( feature="env_log" )))]
+pub use cex_derive::cex_log as cex;
 
-#[cfg( test )]
-mod test;
+#[cfg( all( feature="env_log", not( feature="log" )))]
+pub use cex_derive::cex_env_log as cex;

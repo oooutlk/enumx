@@ -1,6 +1,6 @@
 [package]
 name = "enumx"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "enum", "anonymous", "structural", "sum", "ad-hoc" ]
@@ -11,5 +11,5 @@ categories = [ "rust-patterns" ]
 edition = "2018"
 description = "Structural enum implemented in enum exchange."
 
-[dev-dependencies]
-enumx_derive = "0.3"
+[dependencies.enumx_derive]
+version = "0.3.1"

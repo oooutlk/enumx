@@ -1,6 +1,6 @@
 [package]
 name = "enumx_derive"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "enum", "anonymous", "structural", "sum", "ad-hoc" ]
@@ -15,5 +15,5 @@ description = "Structural enum implemented in enum exchange."
 proc-macro = true
 
 [dependencies]
-quote = "0.6"
-syn = "0.15"
+quote = "1.0"
+syn = { version = "1.0", features = ["extra-traits","full","visit-mut"] }

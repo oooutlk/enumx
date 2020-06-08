@@ -93,6 +93,7 @@ impl<L,R,S0,{src_generics},{generics}> ExchangeFrom<Enum{src_idx}<S0,{src_generi
     let enum_macros = format!( r#"
 #[macro_export]
 macro_rules! Enum {{
+    () => {{ Enum0 }};
 {}
 }}
 "#,

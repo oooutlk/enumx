@@ -1,6 +1,6 @@
 [package]
 name = "cex"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "exception", "error", "throws", "log", "backtrace" ]
@@ -11,13 +11,13 @@ categories = [ "rust-patterns" ]
 edition = "2018"
 description = "Combinators of EnumX, for error-handling"
 
-[dependencies]
-enumx = "0.3"
-failure = { version = "0.1", optional = true }
+[dependencies.enumx]
+version = "^0.3.1"
 
-[dev-dependencies]
-enumx_derive = "0.3"
-cex_derive = "0.3"
+[dependencies.cex_derive]
+version = "0.4"
 
 [features]
-dyn_err = ["failure"]
+log = []
+env_log = []
+pretty_log = []
