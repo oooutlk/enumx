@@ -1,6 +1,6 @@
 [package]
 name = "cex"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "exception", "error", "throws", "log", "backtrace" ]
@@ -12,12 +12,15 @@ edition = "2018"
 description = "Combinators of EnumX, for error-handling"
 
 [dependencies.enumx]
-version = "^0.3.1"
+version = "0.4"
+path = "../enumx"
 
 [dependencies.cex_derive]
-version = "0.4"
+version = "0.5"
+path = "../cex_derive"
 
 [features]
 log = []
 env_log = []
 pretty_log = []
+enum32 = ["enumx/enum32"]

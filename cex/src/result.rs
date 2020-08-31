@@ -1,4 +1,4 @@
-use enumx::prelude::*;
+use enumx::ExchangeInto;
 use crate::log::{Log, LogAgent, Logger, ToLog};
 
 pub struct _WrapOk;
@@ -14,10 +14,10 @@ impl<T,E> Ret<Result<T,E>,_WrapOk> for T {
 }
 
 impl<T,E,F,Index> Ret<Result<T,F>,_MapErr<Index>> for Result<T,E>
-    where E: IntoEnumx<F,Index>
+    where E: ExchangeInto<F,Index>
 {
     fn ret( self ) -> Result<T,F> {
-        self.map_err( |e| e.into_enumx() )
+        self.map_err( |e| e.exchange_into() )
     }
 }
 
@@ -26,10 +26,10 @@ pub trait Throw<Type,Index> {
 }
 
 impl<T,E,F,I> Throw<Result<T,F>,_WrapErr<I>> for E
-    where E: IntoEnumx<F,I>
+    where E: ExchangeInto<F,I>
 {
     fn throw( self ) -> Result<T,F> {
-        Err( self.into_enumx() )
+        Err( self.exchange_into() )
     }
 }
 
@@ -53,20 +53,20 @@ impl<T,E,A> RetLog<Result<T,E>,A,_WrapOk> for T
 impl<T,E,F,A,I> RetLog<Result<T,F>,A,_MapErrToLog<I>> for Result<T,E>
     where A       : LogAgent
         , E       : ToLog<A>
-        , Log<E,A>: IntoEnumx<F,I>
+        , Log<E,A>: ExchangeInto<F,I>
 {
     fn ret_log( self, item: impl Fn() -> A::Item ) -> Result<T,F> {
-        self.map_err( |e| e.to_log( item() ).into_enumx() )
+        self.map_err( |e| e.to_log( item() ).exchange_into() )
     }
 }
 
 impl<T,E,F,A,I> RetLog<Result<T,F>,A,_MapErrLog<I>> for Result<T,E>
     where A : LogAgent
         , E : Logger<A>
-            + IntoEnumx<F,I>
+            + ExchangeInto<F,I>
 {
     fn ret_log( self, item: impl Fn() -> A::Item ) -> Result<T,F> {
-        self.map_err( |e| e.log( item() ).into_enumx() )
+        self.map_err( |e| e.log( item() ).exchange_into() )
     }
 }
 
@@ -79,20 +79,20 @@ pub trait ThrowLog<Type,Agent,Index>
 impl<T,E,F,A,I> ThrowLog<Result<T,F>,A,_ToLog<I>> for E
     where A       : LogAgent
         , E       : ToLog<A>
-        , Log<E,A>: IntoEnumx<F,I>
+        , Log<E,A>: ExchangeInto<F,I>
 {
     fn throw_log( self, item: impl Fn() -> A::Item ) -> Result<T,F> {
-        Err( self.to_log( item() ).into_enumx() )
+        Err( self.to_log( item() ).exchange_into() )
     }
 }
 
 impl<T,E,F,A,I> ThrowLog<Result<T,F>,A,_Log<I>> for E
     where A : LogAgent
         , E : Logger<A>
-            + IntoEnumx<F,I>
+            + ExchangeInto<F,I>
 {
     fn throw_log( self, item: impl Fn() -> A::Item ) -> Result<T,F> {
-        Err( self.log( item() ).into_enumx() )
+        Err( self.log( item() ).exchange_into() )
     }
 }
 

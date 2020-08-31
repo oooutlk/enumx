@@ -3,6 +3,8 @@
 
 //! Checked EXceptions for Rust.
 //!
+//! See the [enumx book](https://oooutlk.github.io/enumx/) for more.
+//!
 //! # Features
 //!
 //! 1. Use `Result!( Type throws A,B,.. )`, `ret!()`, `throw!()` to simulate
@@ -15,6 +17,8 @@
 //! # Examples
 //!
 //! ```rust
+//! use enumx::export::*;
+//! use enumx::predefined::*;
 //! use cex::*;
 //!
 //! // accepts even numbers; rejects odd ones and report an error `String`
@@ -70,31 +74,35 @@
 //! }
 //! ```
 
-pub use enumx::prelude::*;
-pub use enumx::{Enum, TyPat};
+use enumx::export::*;
 
 /// Enum exchange to wrap an `Err`.
+///
 /// ```rust
+/// use enumx::export::*;
+/// use enumx::predefined::*;
 /// use cex::*;
-/// use enumx::Enum;
 ///
 /// let error: Result<(),Enum!(i32,bool)> = 42.error();
 /// assert_eq!( error, Err( Enum2::_0(42) ));
 /// ```
 pub trait Error {
     fn error<T,Dest,Index>( self ) -> Result<T,Dest>
-        where Self: Sized + IntoEnumx<Dest,Index>
+        where Self: Sized + ExchangeInto<Dest,Index>
     {
-        Err( self.into_enumx() )
+        Err( self.exchange_into() )
     }
 }
 
 impl<Enum> Error for Enum {}
 
 /// Enum exchange for `Err` combinator.
+///
 /// ```rust
+///
+/// use enumx::export::*;
+/// use enumx::predefined::*;
 /// use cex::*;
-/// use enumx::Enum;
 ///
 /// let error: Result<(),i32> = Err( 42 );
 /// let error: Result<(),Enum!(i32,bool)> = error.map_error();
@@ -104,9 +112,9 @@ pub trait MapError<T,Src>
     where Self : Into<Result<T,Src>>
 {
     fn map_error<Dest,Indices>( self ) -> Result<T,Dest>
-        where Src : Sized + IntoEnumx<Dest,Indices>
+        where Src : Sized + ExchangeInto<Dest,Indices>
     {
-        self.into().map_err( |src| src.into_enumx() )
+        self.into().map_err( |src| src.exchange_into() )
     }
 }
 
@@ -120,9 +128,15 @@ pub use self::log::*;
 
 #[cfg( not( any( feature="log", feature="env_log" )))]
 pub use cex_derive::cex;
+#[cfg( not( any( feature="log", feature="env_log" )))]
+pub use cex_derive::Result;
 
 #[cfg( all( feature="log", not( feature="env_log" )))]
 pub use cex_derive::cex_log as cex;
+#[cfg( all( feature="log", not( feature="env_log" )))]
+pub use cex_derive::ResultLog;
 
 #[cfg( all( feature="env_log", not( feature="log" )))]
 pub use cex_derive::cex_env_log as cex;
+#[cfg( all( feature="env_log", not( feature="log" )))]
+pub use cex_derive::ResultEnvLog;

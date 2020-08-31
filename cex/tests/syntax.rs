@@ -1,4 +1,4 @@
-#![cfg_attr( test, feature( try_blocks ))]
+#![cfg_attr( test, feature( proc_macro_hygiene, stmt_expr_attributes, try_blocks ))]
 
 macro_rules! define_tests {
     () => {
@@ -61,11 +61,11 @@ macro_rules! define_tests {
                 })
             }
 
-            #[cex] fn closure_throws_abc() {
+            fn closure_throws_abc() {
                 let _f = #[cex] || -> Result!( i32 throws A,B,C ) { throw!(A); throw!(B); throw!(C); ret!(0); };
             }
 
-            #[cex] fn try_throws_abc() {
+            fn try_throws_abc_v2() {
                 #[cex] let _result: Result!( () throws A,B,C ) = try{ throws_abc()? };
             }
 
@@ -80,7 +80,8 @@ macro_rules! define_tests {
 
 #[allow( dead_code, unreachable_code )]
 mod test {
-    use enumx::prelude::*;
+    use enumx::export::*;
+    use enumx::predefined::*;
     use cex_derive::cex;
     use cex::*;
 
@@ -89,7 +90,8 @@ mod test {
 
 #[allow( dead_code, unreachable_code )]
 mod test_log {
-    use enumx::prelude::*;
+    use enumx::export::*;
+    use enumx::predefined::*;
     use cex_derive::cex_log as cex;
     use cex::*;
 
@@ -98,7 +100,8 @@ mod test_log {
 
 #[allow( dead_code, unreachable_code )]
 mod test_env_log {
-    use enumx::prelude::*;
+    use enumx::export::*;
+    use enumx::predefined::*;
     use cex_derive::cex_env_log as cex;
     use cex::*;
 

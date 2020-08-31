@@ -1,14 +1,23 @@
-# Purpose
+Rust's enum lacks of these features:
 
-This is a proof of concept project aiming at
+1. Ad-hoc enums.
+To refer an ad-hoc enum via enumerating all its variants. As an analogy, Rust's
+tuples are ad-hoc struct types.
 
-- Structural enum inplemented enum exchange.
+2. Implement traits for enums via delegating to variants.
 
-- Applying enum exchange with the special interest in error-handling.
+3. Allow functions to return different types which implement a common trait.
+
+4. Enum exchange.
+Conversion between enums which share a common set of variant types.
+
+5. Checked exceptions.
+Enumerating all possible error types in function signature, or hiding them via
+`Result<_, impl Trait>`.
 
 Four crates categorized into the fowllowing sub projects:
 
-# EnumX, for anonymous enum.
+# EnumX, the enum extension library.
 
   Type definitions in `enumx` crate and proc-macro derives in `enumx_derive` crate.
 

@@ -34,18 +34,35 @@ use quote::{
 };
 
 use syn::{
+    Attribute,
+    DeriveInput,
+    Expr,
+    ExprClosure,
+    Generics,
+    Ident,
+    ItemFn,
+    Pat,
+    Path,
+    PathArguments,
+    Stmt,
+    Token,
+    Type,
+    TypePath,
     export::Span,
     parse_quote,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Attribute, DeriveInput, Expr, ExprLet, Generics, Ident, ItemFn, Pat, Path, PathArguments, Stmt, Token, Type, TypePath
+};
+
+use indexmap::{
+    IndexMap,
+    IndexSet,
 };
 
 use std::{
     cell::Cell,
-    collections::{HashMap, HashSet},
     hash::{Hash, Hasher},
     iter::FromIterator,
 };
@@ -111,20 +128,20 @@ pub fn derive_logger( input: TokenStream ) -> TokenStream {
 }
 
 fn add_generics( generics: &mut Generics, name: &'static str ) {
-    let name = ident( name );
+    let name = make_ident( name );
     generics.params.push( parse_quote!( #name ));
 }
 
-fn ident( sym: &str ) -> Ident {
+fn make_ident( sym: &str ) -> Ident {
     Ident::new( sym, Span::call_site() )
 }
 
-struct TypeList( Vec<Path> );
+struct TypePathList( Vec<Path> );
 
-impl Parse for TypeList {
+impl Parse for TypePathList {
     fn parse( input: ParseStream ) -> syn::Result<Self> {
         let types = Punctuated::<Type, Token![,]>::parse_terminated( input )?;
-        Ok( TypeList( types.into_iter().map( |ty| match ty {
+        Ok( TypePathList( types.into_iter().map( |ty| match ty {
             Type::Path( type_path ) => type_path.path,
             _  => parse_quote!( TyPat::<#ty> ),
         }).collect::<Vec<_>>() ))
@@ -143,25 +160,7 @@ impl Hash for TypeIndex {
     fn hash<H:Hasher>( &self, state: &mut H ) { self.0.hash( state )}
 }
 
-type Throws = HashSet<TypeIndex>;
-
-struct CexFn {
-    stack  : Vec<CexTag>,
-    logger : Logger,
-}
-
-impl CexFn {
-    fn new( logger: Logger ) -> Self {
-        CexFn {
-            stack : vec![ CexTag{ ret: None }],
-            logger,
-        }
-    }
-
-    fn peek( &mut self ) -> &mut CexTag { self.stack.last_mut().expect( "CexFn's stack cannot be empty" )}
-    fn push( &mut self, tag: CexTag ) { self.stack.push( tag ); }
-    fn pop( &mut self ) { self.stack.pop(); }
-}
+type Throws = IndexSet<TypeIndex>;
 
 #[derive( Copy, Clone, PartialEq )]
 enum Logger {
@@ -182,21 +181,22 @@ impl From<&'static str> for Logger {
 }
 
 struct Ret {
-    throws : HashSet<TypeIndex>,
+    throws : IndexSet<TypeIndex>,
     ty     : Type,
 }
 
 struct CexTag {
-    ret : Option<Ret>,
+    logger : Logger,
+    ret    : Option<Ret>,
 }
 
 impl CexTag {
-    fn new() -> Self {
-        CexTag{ ret: None }
+    fn new( logger: Logger ) -> Self {
+        CexTag{ logger, ret: None }
     }
 
-    fn parse_type_list( logger: Logger, input: TokenStream ) -> syn::Result<TypeList> {
-        let mut types = syn::parse::<TypeList>( input )?;
+    fn parse_type_path_list( logger: Logger, input: TokenStream ) -> syn::Result<TypePathList> {
+        let mut types = syn::parse::<TypePathList>( input )?;
         match logger {
             Logger::None   => (),
             Logger::Static => types.0.iter_mut().for_each( |ty| *ty = parse_quote_spanned!( ty.span() => Log<#ty> )),
@@ -208,18 +208,6 @@ impl CexTag {
 
 fn to_compact_string( input: impl Into<TokenStream> ) -> String {
     input.into().into_iter().fold( String::new(), |acc, tt| format!( "{}{}", acc, tt ))
-}
-
-fn is_cex_attr( attr: &Attribute ) -> bool {
-    if attr.path.leading_colon.is_none() && attr.path.segments.len() == 1 {
-        match attr.path.segments.first().unwrap().ident.to_string().as_str() {
-            "cex"         |
-            "cex_log"     |
-            "cex_env_log" => return true,
-            _             => (),
-        }
-    }
-    return false;
 }
 
 #[derive( PartialEq )]
@@ -242,8 +230,8 @@ fn parse_ty_pat_attr( logger: Logger, attr: &Attribute ) -> Option<TyPatAttr> {
                             return Some( TyPatAttr::GenThrows );
                         },
                         "gen" => {
-                            let mut throws = HashSet::new();
-                            let types = CexTag::parse_type_list( logger, TokenStream::from_iter( iter )).expect("type list");
+                            let mut throws = IndexSet::new();
+                            let types = CexTag::parse_type_path_list( logger, TokenStream::from_iter( iter )).expect("type list");
                             if types.0.len() == 0 {
                                 return Some( TyPatAttr::GenThrows );
                             } else {
@@ -264,7 +252,7 @@ fn parse_ty_pat_attr( logger: Logger, attr: &Attribute ) -> Option<TyPatAttr> {
     return None;
 }
 
-impl VisitMut for CexFn {
+impl VisitMut for CexTag {
     fn visit_type_mut( &mut self, node: &mut Type ) {
         visit_mut::visit_type_mut( self, node );
 
@@ -287,9 +275,9 @@ impl VisitMut for CexFn {
                     let mut ok = syn::parse::<Type>( ok ).expect("Result!( OkType ... )");
                     self.visit_type_mut( &mut ok );
 
-                    let mut throws = HashSet::new();
+                    let mut throws = IndexSet::new();
                     let rest = TokenStream::from_iter( iter );
-                    let types = CexTag::parse_type_list( self.logger, rest ).expect("type list");
+                    let types = CexTag::parse_type_path_list( self.logger, rest ).expect("type list");
                     types.0.into_iter().for_each( |ty| {
                         let mut type_ = Type::Path( TypePath{ qself: None, path: ty });
                         self.visit_type_mut( &mut type_ );
@@ -302,7 +290,7 @@ impl VisitMut for CexFn {
                     let err = throws.iter().map( |type_index| &type_index.0 );
                     let ty: Type = parse_quote_spanned!( mac.span() => Result<#ok, Enum!(#(#err),*)> );
                     *node = ty.clone();
-                    self.peek().ret = Some( Ret{ throws, ty }); // rewritable
+                    self.ret = Some( Ret{ throws, ty }); // rewritable
                 }
             }
         }
@@ -331,9 +319,9 @@ impl VisitMut for CexFn {
                 if let Some( ty_pat_attrs ) = ty_pat_attrs {
                     let match_expr = &*expr_match.expr;
                     let match_span = match_expr.span();
-                    expr_match.expr = Box::new( parse_quote_spanned!( match_span => ExchangeFrom::exchange_from( #match_expr ) ));
+                    expr_match.expr = Box::new( parse_quote_spanned!( match_span => ::enumx::ExchangeFrom::exchange_from( #match_expr ) ));
                     let mut index = 0_u32;
-                    let checked = expr_match.arms.iter_mut().fold( HashMap::<Path,Cell<u32>>::new(), |mut acc, arm| {
+                    let checked = expr_match.arms.iter_mut().fold( IndexMap::<Path,Cell<u32>>::new(), |mut acc, arm| {
                         let mut add_type_pattern = |path: &mut Path| {
                             let mut nth = index;
                             acc.entry( path.clone() )
@@ -341,7 +329,7 @@ impl VisitMut for CexFn {
                                 .or_insert( Cell::new( nth ));
                             if nth == index { index += 1; }
 
-                            let _n = ident( &format!( "_{}", nth ));
+                            let _n = make_ident( &format!( "_{}", nth ));
                             *path = parse_quote!{ __CexAdhocEnum::#_n };
                         };
 
@@ -384,19 +372,18 @@ impl VisitMut for CexFn {
                         }
                     });
 
-                    let checked = HashSet::<TypeIndex>::from_iter( checked.clone().into_iter().map( |(t,i)| TypeIndex(t,i) ));
+                    let checked = IndexSet::<TypeIndex>::from_iter( checked.clone().into_iter().map( |(t,i)| TypeIndex(t,i) ));
                     let logger = self.logger;
-                    let cex_tag = self.peek();
                     let unexhausted = match &ty_pat_attrs.0 {
                         TyPatAttr::None => Vec::new(),
-                        TyPatAttr::GenThrows => cex_tag.ret.as_ref().expect("Result!( OkType throws ... ) parsed").throws.difference( &checked ).collect::<Vec<_>>(),
+                        TyPatAttr::GenThrows => self.ret.as_ref().expect("Result!( OkType throws ... ) parsed").throws.difference( &checked ).collect::<Vec<_>>(),
                         TyPatAttr::Gen( throws ) => throws.difference( &checked ).collect::<Vec<_>>(),
                     };
 
                     unexhausted.iter().for_each( |TypeIndex(_,i)| {
                         i.set( index );
-                        let _n = ident( &format!( "_{}", index ));
-                        let ret_type = &cex_tag.ret.as_ref().expect("Result!( OkType throws ... ) parsed").ty;
+                        let _n = make_ident( &format!( "_{}", index ));
+                        let ret_type = &self.ret.as_ref().expect("Result!( OkType throws ... ) parsed").ty;
                         expr_match.arms.push(
                             match logger {
                                 Logger::None   => parse_quote_spanned!( match_span => __CexAdhocEnum::#_n(v) => cex::   Throw::<#ret_type,                       _>::throw(     v), ),
@@ -408,28 +395,28 @@ impl VisitMut for CexFn {
                     });
 
                     let (unexhausted_types, unexhausted_indices): (Vec<_>, Vec<_>) = unexhausted.iter().map( |TypeIndex(t,i)| (t,i) ).unzip();
-                    let unexhausted_indices = unexhausted_indices.iter().map( |n| ident( &format!( "_{}", n.get() )));
+                    let unexhausted_indices = unexhausted_indices.iter().map( |n| make_ident( &format!( "_{}", n.get() )));
 
                     let (checked_types, checked_indices): (Vec<_>, Vec<_>) = checked.iter().map( |TypeIndex(t,i)| (t,i) ).unzip();
-                    let checked_indices = checked_indices.iter().map( |n| ident( &format!( "_{}", n.get() )));
+                    let checked_indices = checked_indices.iter().map( |n| make_ident( &format!( "_{}", n.get() )));
 
                     let adhoc_enum = match logger {
                         Logger::None => quote_spanned! { match_span =>
-                            #[derive( enumx::EnumX )]
+                            #[derive( ::enumx::Exchange )]
                             enum __CexAdhocEnum {
                                 #( #checked_indices( #checked_types ), )*
                                 #( #unexhausted_indices( #unexhausted_types ), )*
                             }
                         },
                         Logger::Static => quote_spanned! { match_span =>
-                            #[derive( enumx::EnumX, cex_derive::Logger )]
+                            #[derive( ::enumx::Exchange, cex_derive::Logger )]
                             enum __CexAdhocEnum {
                                 #( #checked_indices( cex::Log<#checked_types> ), )*
                                 #( #unexhausted_indices( #unexhausted_types ), )*
                             }
                         },
                         Logger::EnvOpt => quote_spanned! { match_span =>
-                            #[derive( enumx::EnumX, cex_derive::Logger )]
+                            #[derive( ::enumx::Exchange, cex_derive::Logger )]
                             enum __CexAdhocEnum {
                                 #( #checked_indices( cex::Log<#checked_types, cex::Env<Vec<cex::Frame>>> ), )*
                                 #( #unexhausted_indices( #unexhausted_types ), )*
@@ -461,24 +448,6 @@ impl VisitMut for CexFn {
                     },
                 };
             },
-            Expr::Closure( expr_closure ) => {
-                let mut cex_attr_index = None;
-                for (index,attr) in expr_closure.attrs.iter().enumerate() {
-                    if is_cex_attr( &attr ) {
-                        cex_attr_index = Some( index );
-                        self.push( CexTag::new() );
-                        break;
-                    }
-                }
-
-                self.visit_return_type_mut( &mut expr_closure.output );
-                self.visit_expr_mut( &mut *expr_closure.body );
-
-                cex_attr_index.map( |index| {
-                    expr_closure.attrs.remove( index );
-                    self.pop();
-                });
-            },
             Expr::Macro( expr_macro ) => {
                 let mut mac = &mut expr_macro.mac;
                 if mac.path.leading_colon.is_none() && mac.path.segments.len() == 1 {
@@ -499,7 +468,7 @@ impl VisitMut for CexFn {
                                 expr_list.0.iter_mut().for_each( |expr| self.visit_expr_mut( expr ));
                                 let mut exprs = expr_list.0.into_iter();
                                 let logger = self.logger;
-                                let ret_type = &self.peek().ret.as_ref().expect("Result!( OkType throws ... ) parsed").ty;
+                                let ret_type = &self.ret.as_ref().expect("Result!( OkType throws ... ) parsed").ty;
                                 let span = mac.tokens.span();
                                 *expr = match logger {
                                     Logger::None => {
@@ -572,65 +541,6 @@ impl VisitMut for CexFn {
             },
         }
     }
-
-    fn visit_stmt_mut( &mut self, node: &mut Stmt ) {
-        let mut cex_attr_index = None;
-
-        if let Stmt::Local( local ) = node {
-            for (index,attr) in local.attrs.iter().enumerate() {
-                if is_cex_attr( &attr ) {
-                    cex_attr_index = Some( index );
-                    self.push( CexTag::new() );
-                    break;
-                }
-            }
-        }
-
-        visit_mut::visit_stmt_mut( self, node );
-
-        if let Some( index ) = cex_attr_index {
-            if let Stmt::Local( local ) = node {
-                local.attrs.remove( index );
-                self.pop();
-            }
-        }
-    }
-
-    fn visit_expr_let_mut( &mut self, expr_let: &mut ExprLet ) {
-        let mut cex_attr_index = None;
-        for (index,attr) in expr_let.attrs.iter().enumerate() {
-            if is_cex_attr( &attr ) {
-                cex_attr_index = Some( index );
-                self.push( CexTag::new() );
-                break;
-            }
-        }
-
-        visit_mut::visit_expr_let_mut( self, expr_let );
-
-        cex_attr_index.map( |index| {
-            expr_let.attrs.remove( index );
-            self.pop();
-        });
-    }
-
-    fn visit_item_fn_mut( &mut self, item_fn: &mut ItemFn ) {
-        let mut cex_attr_index = None;
-        for (index,attr) in item_fn.attrs.iter().enumerate() {
-            if is_cex_attr( &attr ) {
-                cex_attr_index = Some( index );
-                self.push( CexTag::new() );
-                break;
-            }
-        }
-
-        visit_mut::visit_item_fn_mut( self, item_fn );
-
-        cex_attr_index.map( |index| {
-            item_fn.attrs.remove( index );
-            self.pop();
-        });
-    }
 }
 
 /// tag an `fn` with `#[cex]` to:
@@ -675,13 +585,166 @@ pub fn cex_env_log( _args: TokenStream, input: TokenStream ) -> TokenStream {
 
 fn expand_cex( tag_name: &'static str, _args: TokenStream, input: TokenStream ) -> TokenStream {
     if let Ok( mut item_fn ) = syn::parse::<ItemFn>( input.clone() ) {
-        let mut cex_fn = CexFn::new( Logger::from( tag_name ));
+        let mut cex_tag = CexTag::new( Logger::from( tag_name ));
 
-        cex_fn.visit_signature_mut( &mut item_fn.sig );
-        cex_fn.visit_block_mut( &mut *item_fn.block );
+        cex_tag.visit_signature_mut( &mut item_fn.sig );
+        cex_tag.visit_block_mut( &mut *item_fn.block );
         let expanded = quote_spanned!( item_fn.span() => #item_fn );
         return TokenStream::from( expanded );
-    } else {
-        panic!( "#[throws] for functions, closures and try blocks only" );
+    } else if let Ok( mut expr_closure ) = syn::parse::<ExprClosure>( input.clone() ) {
+        let mut cex_tag = CexTag::new( Logger::from( tag_name ));
+        cex_tag.visit_return_type_mut( &mut expr_closure.output );
+        cex_tag.visit_expr_mut( &mut *expr_closure.body );
+        let expanded = quote_spanned!( expr_closure.span() => #expr_closure );
+        return TokenStream::from( expanded );
+    } else if let Ok( mut stmt ) = syn::parse::<Stmt>( input ) {
+        if let Stmt::Local(_) = &stmt {
+            let mut cex_tag = CexTag::new( Logger::from( tag_name ));
+            visit_mut::visit_stmt_mut( &mut cex_tag, &mut stmt );
+            let expanded = quote_spanned!( stmt.span() => #stmt );
+            return TokenStream::from( expanded );
+        }
     }
+    panic!( "#[cex] for functions, closures and try blocks only" );
+}
+
+/// # `Result!()` macro
+///
+/// The syntax of `Result!()` macro is
+/// `Result!( OkType throws Err1, Err2, .. )`, the underlying type of which is
+/// `Result<OkType, Enum!(Err1, Err2, ..)>`. However the `Result!()` macro is
+/// preferred over `Enum!()` because:
+///
+/// 1. `Enum!()` is subject to changes on feature of `log`/`env_log`, while
+/// `Result!()` is not.
+///
+/// 2. `throws` is cool, shorter and more clear than `Enum!()`.
+///
+/// ## Use `Result!()` to enumerate the possible error types
+///
+/// - in function signature:
+///
+/// ```rust,no_run
+/// #[cex] fn throws_never() -> Result!(i32) {/**/}
+///
+/// struct SomeError;
+///
+/// #[cex] fn foo() -> Result!( i32 throws String, &'static str, SomeError ) {/**/}
+/// ```
+///
+/// - in closure's signature:
+///
+/// ```rust,no_run
+/// fn foo() {
+///     let _f = #[cex] || -> Result!( i32 throws String ) {/**/}
+/// }
+/// ```
+///
+/// - in the type annotation of a local let-binding:
+///
+/// ```rust,no_run
+/// fn foo() {
+///     #[cex] let v: Result!( i32 throws String ) = try {/**/};
+/// }
+/// ```
+#[proc_macro]
+#[allow( non_snake_case )]
+pub fn Result( input: TokenStream ) -> TokenStream {
+    let mut iter = input.into_iter();
+    let mut ok = TokenStream::new();
+    while let Some(tt) = iter.next() {
+        if let TokenTree::Ident( ident ) = &tt {
+            if ident.to_string() == "throws" {
+                break;
+            }
+        }
+        ok.extend( std::iter::once( tt ));
+    }
+    let ok = syn::parse::<Type>( ok ).expect("Result!( OkType ... )");
+
+    let mut throws = IndexSet::new();
+    let rest = TokenStream::from_iter( iter );
+    let types = syn::parse::<TypePathList>( rest ).expect("type list");
+    types.0.into_iter().for_each( |ty| {
+        let type_ = Type::Path( TypePath{ qself: None, path: ty });
+        match type_ {
+            Type::Path( type_path ) => { throws.insert( TypeIndex( type_path.path, Cell::new(0) )); },
+            _ => unreachable!(),
+        }
+    });
+
+    let err = throws.iter().map( |type_index| &type_index.0 );
+
+    let expanded = quote!( Result<#ok, Enum!(#(#err),*)> );
+    expanded.into()
+}
+
+#[proc_macro]
+#[allow( non_snake_case )]
+pub fn ResultLog( input: TokenStream ) -> TokenStream {
+    let mut iter = input.into_iter();
+    let mut ok = TokenStream::new();
+    while let Some(tt) = iter.next() {
+        if let TokenTree::Ident( ident ) = &tt {
+            if ident.to_string() == "throws" {
+                break;
+            }
+        }
+        ok.extend( std::iter::once( tt ));
+    }
+    let ok = syn::parse::<Type>( ok ).expect("Result!( OkType ... )");
+
+    let mut throws = IndexSet::new();
+    let rest = TokenStream::from_iter( iter );
+
+    let mut types = syn::parse::<TypePathList>( rest ).expect("type list");
+    types.0.iter_mut().for_each( |ty| *ty = parse_quote_spanned!( ty.span() => Log<#ty> ));
+
+    types.0.into_iter().for_each( |ty| {
+        let type_ = Type::Path( TypePath{ qself: None, path: ty });
+        match type_ {
+            Type::Path( type_path ) => { throws.insert( TypeIndex( type_path.path, Cell::new(0) )); },
+            _ => unreachable!(),
+        }
+    });
+
+    let err = throws.iter().map( |type_index| &type_index.0 );
+
+    let expanded = quote!( Result<#ok, Enum!(#(#err),*)> );
+    expanded.into()
+}
+
+#[proc_macro]
+#[allow( non_snake_case )]
+pub fn ResultEnvLog( input: TokenStream ) -> TokenStream {
+    let mut iter = input.into_iter();
+    let mut ok = TokenStream::new();
+    while let Some(tt) = iter.next() {
+        if let TokenTree::Ident( ident ) = &tt {
+            if ident.to_string() == "throws" {
+                break;
+            }
+        }
+        ok.extend( std::iter::once( tt ));
+    }
+    let ok = syn::parse::<Type>( ok ).expect("Result!( OkType ... )");
+
+    let mut throws = IndexSet::new();
+    let rest = TokenStream::from_iter( iter );
+
+    let mut types = syn::parse::<TypePathList>( rest ).expect("type list");
+    types.0.iter_mut().for_each( |ty| *ty = parse_quote_spanned!( ty.span() => Log<#ty, cex::Env<Vec<cex::Frame>>> ));
+
+    types.0.into_iter().for_each( |ty| {
+        let type_ = Type::Path( TypePath{ qself: None, path: ty });
+        match type_ {
+            Type::Path( type_path ) => { throws.insert( TypeIndex( type_path.path, Cell::new(0) )); },
+            _ => unreachable!(),
+        }
+    });
+
+    let err = throws.iter().map( |type_index| &type_index.0 );
+
+    let expanded = quote!( Result<#ok, Enum!(#(#err),*)> );
+    expanded.into()
 }

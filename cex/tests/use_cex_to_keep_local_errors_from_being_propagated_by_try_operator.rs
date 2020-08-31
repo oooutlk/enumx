@@ -1,3 +1,5 @@
+use enumx::export::*;
+use enumx::predefined::*;
 use cex::*;
 
 pub struct A; // was: FatalError1

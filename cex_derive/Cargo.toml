@@ -1,6 +1,6 @@
 [package]
 name = "cex_derive"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "exception", "error", "throws", "log", "backtrace" ]
@@ -17,3 +17,4 @@ proc-macro = true
 [dependencies]
 quote = "1.0"
 syn = { version = "1.0", features = ["extra-traits","full","visit-mut"] }
+indexmap = "1.4"
