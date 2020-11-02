@@ -9,11 +9,10 @@ repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/enumx"
 categories = [ "rust-patterns" ]
 edition = "2018"
-description = "Structural enum implemented in enum exchange."
+description = "Ad-hoc enum extension."
 
 [dependencies.enumx_derive]
 version = "0.4"
-path = "../enumx_derive"
 
 [features]
 default = ["enum16"]

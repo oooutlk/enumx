@@ -9,7 +9,7 @@ repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/enumx_derive"
 categories = [ "rust-patterns" ]
 edition = "2018"
-description = "Structural enum implemented in enum exchange."
+description = "Macros for ad-hoc enum extension"
 
 [lib]
 proc-macro = true

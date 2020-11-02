@@ -9,7 +9,7 @@ repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/cex_derive"
 categories = [ "rust-patterns" ]
 edition = "2018"
-description = "Combinators of EnumX, for error-handling"
+description = "Macros for checked exception simulation"
 
 [lib]
 proc-macro = true
