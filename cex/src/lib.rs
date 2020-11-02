@@ -14,6 +14,8 @@
 //!
 //! 3. Optional backtrace support.
 //!
+//! 4. Fallback as `impl std::error::Error`.
+//!
 //! # Examples
 //!
 //! ```rust

@@ -15,6 +15,17 @@
 
 pub mod macros;
 
+/// Reorganize types, traits and macros to export to end users.
+///
+/// Two categories:
+///
+/// 1. enum exchange.
+///
+/// 2. enum trait implementations.
+///
+/// If users want to import utils in #1, just `use enumx::export::exchange::*;`.
+/// If users want to import utils in #2, just `use enumx::export::impls::*;`.
+/// If utils both in #1 and #2 are needed, just `use enumx::export::*;`.
 pub mod export {
     pub mod exchange {
         pub use crate::{
@@ -65,10 +76,12 @@ pub use enumx_derive::{
     sum_err,
 };
 
+/// Constructs an enum from one of its variants.
 pub trait FromVariant<Variant, Index> {
     fn from_variant( variant: Variant ) -> Self;
 }
 
+/// Wraps a variant into an enum.
 pub trait IntoEnum<Enum, Index> {
     fn into_enum( self ) -> Enum;
 }
@@ -81,10 +94,12 @@ impl<Enum,Variant,Index> IntoEnum<Enum, Index> for Variant
     }
 }
 
+/// Constructs an enum from one of its variants, or from an enum composed of a subset of its variants.
 pub trait ExchangeFrom<Src, Index> {
     fn exchange_from( src: Src ) -> Self;
 }
 
+/// Wraps a variant into an enum, or converts an enum into another one, the variants of which is a superset of the converted enum's.
 pub trait ExchangeInto<Dest, Index> {
     fn exchange_into( self ) -> Dest;
 }
@@ -97,6 +112,7 @@ impl<Src, Dest, Index> ExchangeInto<Dest, Index> for Src
     }
 }
 
+/// Used in `ExchangeFrom`/`ExchangeInto` to distinguish conversions between enums from those between an enum and its variant.
 pub struct EnumToEnum<Index>( Index );
 
 /// Indicates the prototype for a user-defined `Exchange`-able enum.
@@ -149,7 +165,7 @@ pub mod predefined {
     }
 
     #[cfg( feature="enum16" )]
-    pub mod enum0_16 {
+    pub mod enum1_16 {
         use super::*;
 
         impl_trait!{ _impl!(T) AsRef<T> _for!( Enum![1..=16] )}
@@ -201,6 +217,7 @@ pub mod predefined {
     }
 }
 
+/// Since `enum`s in Rust do not have prototypes, this mod does the work.
 pub mod proto {
     use crate as enumx;
     use crate::def_impls;

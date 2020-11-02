@@ -1,7 +1,7 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
 // Licensed under MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>
 
-//! This project provides derive implementation for user-defined enum exchange.
+//! This project provides derive implementation for the enumx crate .
 //!
 //! See [enumx README](https://github.com/oooutlk/enumx/blob/master/enumx/README.md) for more.
 
@@ -423,6 +423,7 @@ pub fn def_impls( input: TokenStream ) -> TokenStream {
     }
 }
 
+/// Derives the trait `enumx::FromVariant` for user defined enum types.
 #[proc_macro_derive( FromVariant )]
 pub fn derive_from_variant( input: TokenStream ) -> TokenStream {
     let input: DeriveInput = syn::parse( input ).unwrap();
@@ -473,6 +474,7 @@ pub fn derive_from_variant( input: TokenStream ) -> TokenStream {
     }
 }
 
+/// Since `enum`s in Rust do not have prototypes, this macro derives them.
 #[proc_macro_derive( Proto )]
 pub fn derive_proto( input: TokenStream ) -> TokenStream {
     let input: DeriveInput = syn::parse( input ).unwrap();

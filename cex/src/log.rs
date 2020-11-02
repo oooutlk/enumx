@@ -1,4 +1,5 @@
 //! # Backtrace
+//!
 //! Backtrace is disabled by default. When enabled, locations of error propagation
 //! by `ret!()`, `throw!()` and `?` operator will be stored in the `Err` variant.
 //!
