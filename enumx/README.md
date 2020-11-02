@@ -14,8 +14,7 @@ Add this crate to Cargo.toml
 `Cargo.toml`:
 
 ```toml
-enumx]
-version = "0.4"
+enumx = "0.4"
 ```
 
 Add this if you want to support up to 32 variants:
