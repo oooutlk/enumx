@@ -47,7 +47,7 @@ implemented the traits.
 
 # Documentation
 
-See the [enumx book](https://github.com/oooutlk/enumx/md/book/) for more.
+See the [enumx book](https://oooutlk.github.io/enumx/) for more.
 
 # License
 
