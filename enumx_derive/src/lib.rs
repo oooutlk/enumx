@@ -64,7 +64,6 @@ use syn::{
     WhereClause,
     braced,
     bracketed,
-    export::Span,
     parse_macro_input,
     parse_quote,
     parse::{Parse, ParseStream},
@@ -74,9 +73,12 @@ use syn::{
     visit_mut::{self, VisitMut},
 };
 
+extern crate proc_macro2;
+use proc_macro2::Span;
+
 macro_rules! syntax_error {
     () => {
-        panic!( "`enum`s deriving `FromVariant`/`Proto` should be in the form of \"enum MyEnum { Foo(Type), Bar(AnotherType),... }\"" );
+        panic!( "{}", "`enum`s deriving `FromVariant`/`Proto` should be in the form of \"enum MyEnum { Foo(Type), Bar(AnotherType),... }\"" );
     }
 }
 
@@ -151,7 +153,7 @@ impl Parse for EnumDefImpls {
             let def = input.parse::<ItemMacro>()?;
             match path_ident_name( &def.mac.path ).as_deref() {
                 Some( "_def" ) => (),
-                _ => panic!( "expect _def!{{}}" ),
+                _ => panic!( "{}", "expect _def!{{}}" ),
             }
             let item_enum = def.mac.parse_body::<ItemEnum>()?;
 
@@ -963,7 +965,7 @@ impl VisitMut for MatchExpander {
                         let vtype = &self.vtypes[ self.index ];
                         *node = parse_quote!( #vtype );
                     } else {
-                        panic!("def_impls!{ impl }: Variant!() should have no argument");
+                        panic!( "{}", "def_impls!{ impl }: Variant!() should have no argument" );
                     }
                 }
             }
@@ -1018,7 +1020,7 @@ impl<'a> Visit<'a> for EnumWhere {
                 if type_macro.mac.tokens.is_empty() {
                     self.contains_variants = true;
                 } else {
-                    panic!("def_impls!{ impl }: Variants!() should have no argument");
+                    panic!( "{}", "def_impls!{ impl }: Variants!() should have no argument" );
                 }
             }
         }
@@ -1036,7 +1038,7 @@ impl VisitMut for EnumWhere {
                         let ty = &self.variant_types[ self.nth_variant ];
                         *node = parse_quote!( #ty );
                     } else {
-                        panic!("def_impls!{ impl }: Variants!() should have no argument");
+                        panic!( "{}", "def_impls!{ impl }: Variants!() should have no argument" );
                     }
                 }
             }
@@ -1178,7 +1180,7 @@ fn expand_enum_impl( mut item_impl: ItemImpl, item_enum: Option<&ItemEnum> ) -> 
         let expanded = quote!( #item_impl );
         return expanded.into();
     } else {
-        panic!( "The enum's variants are unknown to `def_impls!{}`. Consider using `_def!{}` to provide the variants of the enum defined elsewhere." );
+        panic!( "{}", "The enum's variants are unknown to `def_impls!{}`. Consider using `_def!{}` to provide the variants of the enum defined elsewhere." );
     };
 }
 

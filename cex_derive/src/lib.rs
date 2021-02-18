@@ -48,13 +48,15 @@ use syn::{
     Token,
     Type,
     TypePath,
-    export::Span,
     parse_quote,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
+
+extern crate proc_macro2;
+use proc_macro2::Span;
 
 use indexmap::{
     IndexMap,
@@ -103,7 +105,7 @@ pub fn derive_logger( input: TokenStream ) -> TokenStream {
                         return &field.ty;
                     }
                 }
-                panic!( "A type deriving `Logger` should be in the form of \"enum Name { Foo(Type), Bar(AnotherType),... }\"" );
+                panic!( "{}", "A type deriving `Logger` should be in the form of \"enum Name { Foo(Type), Bar(AnotherType),... }\"" );
             });
 
             let expanded = quote! {
