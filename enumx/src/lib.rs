@@ -154,13 +154,13 @@ pub mod predefined {
 
     #[cfg( feature="enum16" )]
     def_impls! {
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( Exchange, Clone, Debug, PartialEq, Eq, PartialOrd, Ord )]
         pub enum Enum![ 0..=16 ];
     }
 
     #[cfg( feature="enum32" )]
     def_impls! {
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( Exchange, Clone, Debug, PartialEq, Eq, PartialOrd, Ord )]
         pub enum Enum![ 17..=32 ];
     }
 
@@ -338,18 +338,18 @@ mod tests {
         use crate::predefined::*;
         use crate as enumx;
 
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( Exchange, Clone, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum One<T> {
             The(T),
         }
 
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( Exchange, Clone, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum Two<A, B> {
             Former(A),
             Latter(B),
         }
 
-        #[derive( Exchange, Debug, PartialEq, Eq, PartialOrd, Ord )]
+        #[derive( Exchange, Clone, Debug, PartialEq, Eq, PartialOrd, Ord )]
         enum Three<A, B, C> {
             First(A),
             Second(B),
