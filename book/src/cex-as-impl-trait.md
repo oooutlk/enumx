@@ -18,9 +18,9 @@ impl Error for A { /* omitted */ }
 impl Error for B { /* omitted */ }
 impl Error for C { /* omitted */ }
 
-#[cex] pub fn upstream() -> Result!( () throws A, B, C );
+#[cex] pub fn some_cex_function() -> Result!( () throws A, B, C );
 
 fn downstream() -> Result<(), impl Error> {
-    Ok( upstream()? )
+    Ok( some_cex_function()? )
 }
 ```

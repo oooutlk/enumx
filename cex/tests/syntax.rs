@@ -1,4 +1,4 @@
-#![cfg_attr( test, feature( proc_macro_hygiene, stmt_expr_attributes, try_blocks ))]
+#![cfg_attr( feature = "unstable", feature( proc_macro_hygiene, stmt_expr_attributes, try_blocks ))]
 
 macro_rules! define_tests {
     () => {
@@ -61,10 +61,12 @@ macro_rules! define_tests {
                 })
             }
 
+            #[cfg( feature = "unstable" )]
             fn closure_throws_abc() {
                 let _f = #[cex] || -> Result!( i32 throws A,B,C ) { throw!(A); throw!(B); throw!(C); ret!(0); };
             }
 
+            #[cfg( feature = "unstable" )]
             fn try_throws_abc_v2() {
                 #[cex] let _result: Result!( () throws A,B,C ) = try{ throws_abc()? };
             }

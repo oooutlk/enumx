@@ -1,4 +1,4 @@
-#![cfg_attr( test, feature(
+#![cfg_attr( unstable, feature(
     fn_traits,
     generator_trait,
     generators,

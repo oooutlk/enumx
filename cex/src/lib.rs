@@ -132,13 +132,19 @@ pub use self::log::*;
 pub use cex_derive::cex;
 #[cfg( not( any( feature="log", feature="env_log" )))]
 pub use cex_derive::Result;
+#[cfg( not( any( feature="log", feature="env_log" )))]
+pub use cex_derive::Throws;
 
 #[cfg( all( feature="log", not( feature="env_log" )))]
 pub use cex_derive::cex_log as cex;
 #[cfg( all( feature="log", not( feature="env_log" )))]
-pub use cex_derive::ResultLog;
+pub use cex_derive::ResultLog as Result;
+#[cfg( all( feature="log", not( feature="env_log" )))]
+pub use cex_derive::ThrowsLog as Throws;
 
 #[cfg( all( feature="env_log", not( feature="log" )))]
 pub use cex_derive::cex_env_log as cex;
 #[cfg( all( feature="env_log", not( feature="log" )))]
-pub use cex_derive::ResultEnvLog;
+pub use cex_derive::ResultEnvLog as Result;
+#[cfg( all( feature="env_log", not( feature="log" )))]
+pub use cex_derive::ThrowsEnvLog as Throws;

@@ -664,17 +664,7 @@ pub fn Result( input: TokenStream ) -> TokenStream {
     }
     let ok = syn::parse::<Type>( ok ).expect("Result!( OkType ... )");
 
-    let mut throws = IndexSet::new();
-    let rest = TokenStream::from_iter( iter );
-    let types = syn::parse::<TypePathList>( rest ).expect("type list");
-    types.0.into_iter().for_each( |ty| {
-        let type_ = Type::Path( TypePath{ qself: None, path: ty });
-        match type_ {
-            Type::Path( type_path ) => { throws.insert( TypeIndex( type_path.path, Cell::new(0) )); },
-            _ => unreachable!(),
-        }
-    });
-
+    let throws = collect_throws( TokenStream::from_iter( iter ));
     let err = throws.iter().map( |type_index| &type_index.0 );
 
     let expanded = quote!( Result<#ok, Enum!(#(#err),*)> );
@@ -696,20 +686,7 @@ pub fn ResultLog( input: TokenStream ) -> TokenStream {
     }
     let ok = syn::parse::<Type>( ok ).expect("Result!( OkType ... )");
 
-    let mut throws = IndexSet::new();
-    let rest = TokenStream::from_iter( iter );
-
-    let mut types = syn::parse::<TypePathList>( rest ).expect("type list");
-    types.0.iter_mut().for_each( |ty| *ty = parse_quote_spanned!( ty.span() => Log<#ty> ));
-
-    types.0.into_iter().for_each( |ty| {
-        let type_ = Type::Path( TypePath{ qself: None, path: ty });
-        match type_ {
-            Type::Path( type_path ) => { throws.insert( TypeIndex( type_path.path, Cell::new(0) )); },
-            _ => unreachable!(),
-        }
-    });
-
+    let throws = collect_throws( TokenStream::from_iter( iter ));
     let err = throws.iter().map( |type_index| &type_index.0 );
 
     let expanded = quote!( Result<#ok, Enum!(#(#err),*)> );
@@ -731,10 +708,82 @@ pub fn ResultEnvLog( input: TokenStream ) -> TokenStream {
     }
     let ok = syn::parse::<Type>( ok ).expect("Result!( OkType ... )");
 
-    let mut throws = IndexSet::new();
-    let rest = TokenStream::from_iter( iter );
+    let throws = collect_throws( TokenStream::from_iter( iter ));
+    let err = throws.iter().map( |type_index| &type_index.0 );
 
-    let mut types = syn::parse::<TypePathList>( rest ).expect("type list");
+    let expanded = quote!( Result<#ok, Enum!(#(#err),*)> );
+    expanded.into()
+}
+
+/// This is for trait's associated type that is an error.
+/// Don't use it in cex function signature, use `Result!()`.
+#[proc_macro]
+#[allow( non_snake_case )]
+pub fn Throws( input: TokenStream ) -> TokenStream {
+    let throws = collect_throws( input );
+    let err = throws.iter().map( |type_index| &type_index.0 );
+
+    let expanded = quote!( Enum!(#(#err),*) );
+    expanded.into()
+}
+
+/// This is for trait's associated type that is an error.
+/// Don't use it in cex function signature, use `Result!()`.
+#[proc_macro]
+#[allow( non_snake_case )]
+pub fn ThrowsLog( input: TokenStream ) -> TokenStream {
+    let throws = collect_throws_log( input );
+    let err = throws.iter().map( |type_index| &type_index.0 );
+
+    let expanded = quote!( Enum!(#(#err),*) );
+    expanded.into()
+}
+
+/// This is for trait's associated type that is an error.
+/// Don't use it in cex function signature, use `Result!()`.
+#[proc_macro]
+#[allow( non_snake_case )]
+pub fn ThrowsEnvLog( input: TokenStream ) -> TokenStream {
+    let throws = collect_throws_env_log( input );
+    let err = throws.iter().map( |type_index| &type_index.0 );
+
+    let expanded = quote!( Enum!(#(#err),*) );
+    expanded.into()
+}
+
+fn collect_throws( input: TokenStream ) -> IndexSet<TypeIndex> {
+    let mut throws = IndexSet::new();
+    let types = syn::parse::<TypePathList>( input ).expect("type list");
+    types.0.into_iter().for_each( |ty| {
+        let type_ = Type::Path( TypePath{ qself: None, path: ty });
+        match type_ {
+            Type::Path( type_path ) => { throws.insert( TypeIndex( type_path.path, Cell::new(0) )); },
+            _ => unreachable!(),
+        }
+    });
+
+    throws
+}
+
+fn collect_throws_log( input: TokenStream ) -> IndexSet<TypeIndex> {
+    let mut throws = IndexSet::new();
+    let mut types = syn::parse::<TypePathList>( input ).expect("type list");
+    types.0.iter_mut().for_each( |ty| *ty = parse_quote_spanned!( ty.span() => Log<#ty> ));
+
+    types.0.into_iter().for_each( |ty| {
+        let type_ = Type::Path( TypePath{ qself: None, path: ty });
+        match type_ {
+            Type::Path( type_path ) => { throws.insert( TypeIndex( type_path.path, Cell::new(0) )); },
+            _ => unreachable!(),
+        }
+    });
+
+    throws
+}
+
+fn collect_throws_env_log( input: TokenStream ) -> IndexSet<TypeIndex> {
+    let mut throws = IndexSet::new();
+    let mut types = syn::parse::<TypePathList>( input ).expect("type list");
     types.0.iter_mut().for_each( |ty| *ty = parse_quote_spanned!( ty.span() => Log<#ty, cex::Env<Vec<cex::Frame>>> ));
 
     types.0.into_iter().for_each( |ty| {
@@ -745,8 +794,5 @@ pub fn ResultEnvLog( input: TokenStream ) -> TokenStream {
         }
     });
 
-    let err = throws.iter().map( |type_index| &type_index.0 );
-
-    let expanded = quote!( Result<#ok, Enum!(#(#err),*)> );
-    expanded.into()
+    throws
 }

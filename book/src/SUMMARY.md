@@ -22,3 +22,5 @@
     - [Backtrace](./cex-backtrace.md)
     - ["Type as Pattern" makes sense for narrowing](./cex-typat.md)
     - [Fallback as `impl Trait`](./cex-as-impl-trait.md)
+    - [Fallback to "crate error"](./cex-to-crate-error.md)
+    - [Fallback as `Box<dyn std::error::Error>`](./cex-as-dyn-std-error.md)

@@ -13,6 +13,7 @@
     unboxed_closures
 ))]
 
+#[macro_use]
 pub mod macros;
 
 /// Reorganize types, traits and macros to export to end users.

@@ -1,9 +1,9 @@
 [package]
 name = "cex"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
-keywords = [ "exception", "error", "throws", "log", "backtrace" ]
+keywords = [ "exception", "error", "throws", "ad-hoc", "anonymous" ]
 readme = "README.md"
 repository = "https://github.com/oooutlk/enumx"
 documentation = "https://docs.rs/cex"
@@ -16,7 +16,7 @@ version = "^0.4.1"
 path = "../enumx"
 
 [dependencies.cex_derive]
-version = "^0.5.1"
+version = "^0.5.2"
 path = "../cex_derive"
 
 [features]
@@ -24,3 +24,4 @@ log = []
 env_log = []
 pretty_log = []
 enum32 = ["enumx/enum32"]
+unstable = []

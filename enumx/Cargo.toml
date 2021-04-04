@@ -1,6 +1,6 @@
 [package]
 name = "enumx"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "enum", "anonymous", "structural", "sum", "ad-hoc" ]

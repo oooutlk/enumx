@@ -1,4 +1,4 @@
-#![cfg_attr( test, feature(
+#![cfg_attr( feature = "unstable", feature(
     fn_traits,
     generator_trait,
     generators,
@@ -58,6 +58,7 @@ fn syntax() {
         }
     }
 
+    #[cfg( feature = "unstable" )]
     let _bar = #[enumx] |i: i32| -> Enum!( String, usize, &'static str ) {
         #[ty_pat] match _foo(i) {
             String(s) => if s.len() % 2 == 0 {
@@ -69,6 +70,7 @@ fn syntax() {
         }
     };
 
+    #[cfg( feature = "unstable" )]
     #[enumx] let _bar_v2 = |i: i32| -> Enum!( String, usize, &'static str ) {
         #[ty_pat(gen_variants)] match _foo(i) {
             String(s) => if s.len() % 2 == 0 {
@@ -90,6 +92,7 @@ fn sum_syntax() {
         }
     }
 
+    #[cfg( feature = "unstable" )]
     #[sum]
     fn _fn( cond: bool ) -> impl Fn()->i32 {
         if cond {
@@ -154,20 +157,29 @@ fn impl_for_predefined() {
     impl_trait!{ DoubleEndedIterator _for!( Enum![1..=3] )}
     impl_trait!{ ExactSizeIterator _for!( Enum![1..=3] )}
     impl_trait!{ _impl!(A) Extend<A> _for!( Enum![1..=3] )}
+
+    #[cfg( feature = "unstable" )]
     impl_trait!{ _impl!(Args) Fn<Args> _for!( Enum![1..=3] )}
+
     impl_trait!{ Iterator _for!( Enum![1..=3] )}
     impl_trait!{ std::error::Error _for!( Enum![1..=3] )}
     impl_trait!{ std::fmt::Debug _for!( Enum![1..=3] )}
     impl_trait!{ std::fmt::Display _for!( Enum![1..=3] )}
     impl_trait!{ std::iter::FusedIterator _for!( Enum![1..=3] )}
+
+    #[cfg( feature = "unstable" )]
     impl_trait!{ std::iter::TrustedLen _for!( Enum![1..=3] )}
+
     impl_trait!{ std::io::BufRead _for!( Enum![1..=3] )}
     impl_trait!{ std::io::Read _for!( Enum![1..=3] )}
     impl_trait!{ std::io::Seek _for!( Enum![1..=3] )}
     impl_trait!{ std::io::Write _for!( Enum![1..=3] )}
     impl_trait!{ std::ops::Deref _for!( Enum![1..=3] )}
     impl_trait!{ std::ops::DerefMut _for!( Enum![1..=3] )}
+
+    #[cfg( feature = "unstable" )]
     impl_trait!{ _impl!(R) std::ops::Generator<R> _for!( Enum![1..=3] )}
+
     impl_trait!{ _impl!(Idx) std::ops::Index<Idx> _for!( Enum![1..=3] )}
     impl_trait!{ _impl!(Idx) std::ops::IndexMut<Idx> _for!( Enum![1..=3] )}
     impl_trait!{ _impl!(T) std::ops::RangeBounds<T> _for!( Enum![1..=3] )}

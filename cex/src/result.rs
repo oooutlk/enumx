@@ -185,3 +185,79 @@ impl<R,T,E,F,A,I> MapErrorLog<T,E,F,A,I> for R
         , E : ThrowLog<Result<T,F>,A,I>
 {
 }
+
+/// Get Ok type and Err type of a Result.
+pub trait OkError {
+    type Ok;
+    type Error;
+}
+
+impl<T,E> OkError for Result<T,E> {
+    type Ok    = T;
+    type Error = E;
+}
+
+/// Help to implement `std::error::Error` for errors that have already
+/// implemented `std::fmt::Debug`.
+#[macro_export]
+macro_rules! impl_std_error {
+    ($ident:ident $(<$($gen:tt),*>)* ) => {
+        impl $(<$($gen),*>)* Display for $ident $(<$($gen),*>)*
+            where $($($gen: Debug),*)*
+        {
+            fn fmt( &self, formatter: &mut fmt::Formatter ) -> fmt::Result {
+                <$ident $(<$($gen),*>)* as Debug>::fmt( self, formatter )
+            }
+        }
+
+        impl $(<$($gen),*>)* std::error::Error for $ident $(<$($gen),*>)*
+            where $($($gen: Debug),*)*
+        {
+        }
+    };
+}
+
+#[cfg( not( any( feature="log", feature="env_log" )))]
+/// Help to define a summarizing error type of the crate.
+/// The crate error should not appear in cex function's signature, but for
+/// downstream users of cex functions, who do not want to adopt checked
+/// exceptions.
+#[macro_export]
+macro_rules! crate_error {
+    ( $( #[$attrs:meta] )* $vis:vis enum $ty:ident{ $($error:ident,)* }) => {
+        /// The crate error type for users who do not want to use checked exceptions( `#[cex]` ).
+        $( #[$attrs] )*
+        $vis enum $ty{
+            $( $error( $error ), )*
+        }
+
+        $( impl From<$error> for $ty { fn from( e: $error ) -> Self { $ty::$error( e )}} )*
+    };
+}
+
+#[cfg( any( feature="log", feature="env_log" ))]
+/// Help to define a summarizing error type of the crate.
+/// The crate error should not appear in cex function's signature, but for
+/// downstream users of cex functions, who do not want to adopt checked
+/// exceptions.
+#[macro_export]
+macro_rules! crate_error {
+    ( $( #[$attrs:meta] )* $vis:vis enum $ty:ident{ $($error:ident,)* }) => {
+        /// The crate error type for users who do not want to use checked exceptions( `#[cex]` ).
+        $( #[$attrs] )*
+        $vis enum $ty{
+            $( $error( cex::Log<$error> ), )*
+        }
+
+        $(
+            impl From<cex::Log<$error>> for $ty { fn from( e: cex::Log<$error> ) -> Self { $ty::$error( e )}}
+
+            impl From<$error> for $ty {
+                fn from( e: $error ) -> Self {
+                    use cex::ToLog;
+                    $ty::$error( e.new_log() )
+                }
+            }
+        )*
+    };
+}
